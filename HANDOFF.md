@@ -1,53 +1,99 @@
 # HANDOFF — QA Operating System
 
-**Fecha:** 2026-07-04
-**Estado:** Stage 0 (Genesis) CERRADO. En el límite Stage 0 → Stage 1, esperando que el usuario elija dirección.
+**Fecha:** 2026-07-05
+**Estado:** Stage 1 EN CURSO. Dos fichas de proceso completas (control de versiones + gate
+de CI). Esperando elegir/diseñar la siguiente ficha del Stage 1.
 
 ---
 
 ## ▶ AL RETOMAR — leé esto primero
 
-La fundación y la etapa Genesis están completas. **Lo único pendiente es que el usuario elija el rumbo de Stage 1 entre tres escenarios (A / B / C)** — están al final de este doc. No hay que rehacer nada; se arranca eligiendo escenario.
+No hay que rehacer nada. **El producto de Genesis está construido y verificado, y el
+Stage 1 arrancó con dos fichas ya completas.** Se retoma eligiendo la próxima ficha
+(ver "Decisión pendiente" al final).
 
-Antes de responder, **leé los artefactos** (no los dupliques, ya existen):
-- `docs/adr/0001-how-we-record-decisions.md`
-- `docs/adr/0002-the-simulated-company.md`
-- `docs/adr/0003-genesis-quality-posture.md`
-- `CONTEXT.md`
-- Los tres docs de fundación: `PROJECT.md`, `HOW_WE_WORK.md`, `CLAUDE.md`
+Antes de responder, **mirá los artefactos** (existen, no los dupliques):
+- Repo: **https://github.com/santiagodeleon1411/qa-operating-system** (PÚBLICO)
+- ADRs `docs/adr/0001`…`0004` — el 0004 (gate de CI) supersede el "no CI" del 0003.
+- `estoca/` — producto corriendo (Vite + TS). `estoca/README.md` explica correr/testear.
+- `docs/qa/genesis-manual-test-execution.md` — registro manual firmado de Genesis.
+- `showcase/` — accesos `.command` doble-clickeables al producto tangible.
+- Fundación: `PROJECT.md`, `HOW_WE_WORK.md`, `CONTEXT.md`, `CLAUDE.md`.
 
-## Rol y estilo (importante para la voz de la sesión)
-- Claude es **mentor de QA / thought partner**, NO asistente. Desafía supuestos, explica trade-offs, presenta alternativas, adapta a la madurez de la empresa. Ver `CLAUDE.md` y `HOW_WE_WORK.md`.
-- Se trabaja **discusión → consenso → recién ahí documentar**. Una pregunta a la vez (estilo grill-me).
+## Rol y estilo (CRÍTICO para la voz de la sesión)
+- Claude es **mentor de QA / thought partner**, NO asistente. Desafía supuestos, explica
+  trade-offs, adapta a la madurez de la empresa.
+- **El usuario pidió explícitamente NO ser rubber-stamp:** en decisiones importantes,
+  **él se compromete primero** con una postura y su porqué; recién ahí Claude discute,
+  a veces defendiendo la opción contraria. Discrepar es el objetivo. (Ver esta dinámica
+  en acción en la sesión: varias veces el usuario razonó bien solo y se lo reforzó; una
+  vez Claude se equivocó — "arrancás solo" — y el ADR-0003 le dio la razón al usuario.)
 - **Artefactos en inglés, conversación en español.**
-- **Ritmo:** el usuario se abrumó una vez con demasiados nombres/tecnicismos juntos. Ir despacio, pocos términos nuevos por vez, chequear comprensión.
+- **Ritmo:** pocos términos nuevos por vez, chequear comprensión. El usuario se abruma
+  con jerga acumulada. Explicar conceptos en criollo (ej.: se explicó "invariante" de cero).
+- Filosofía: cada herramienta entra **cuando el dolor la justifica**, de a una ficha.
 
-## Qué se decidió (resumen; el detalle está en los ADRs)
-- **Empresa:** "Estoca" (nombre provisional) — SaaS B2B de control de stock en tiempo real para comercios retail chicos, mono-sucursal. Arranca con UN producto; multiproducto es evento de madurez futuro.
-- **Columna vertebral:** hitos de madurez (pre-producto → MVP → primeros clientes → escalamiento → madurez).
-- **Lector primario:** el QA/Engineering Manager que va a entrevistar al usuario.
-- **Realismo:** diseño-real siempre; artefactos concretos solo en momentos críticos de credibilidad; Figma MCP y conexiones reales cuando el dolor las justifique.
-- **Rol del usuario en la historia:** ingeniero #1 que carga la mirada de calidad (QA nace desde cero).
-- **Postura de calidad de Genesis:** poco esfuerzo, todo concentrado en el invariante "el Stock nunca miente" (Stock derivado de los movimientos, no un contador mutable). Se niega explícitamente: hire de QA, plan formal, framework E2E, gates de CI. Ver ADR-0003.
-- **Calibración del usuario:** mid-senior, ~4 años. Desafiarlo en trade-offs y estrategia.
+## Canon de la simulación (NO volver a confundir)
+- Estoca en Genesis = **3 personas, pre-PMF** (ADR-0003). El usuario es **ingeniero #1,
+  el único que escribe código**. El escenario elegido para Stage 1 fue **"crece la carga
+  y no das abasto" → entra el ingeniero #2** (tracción, tono de planificación fría, no susto).
+- Invariante sagrado: **"el Stock nunca miente"** — Stock derivado de los movimientos,
+  nunca un contador mutable. Ya está hecho estructura en el código + safety net.
+- (Memoria persistida en `estoca-genesis-canon` con esto.)
+
+## Qué se construyó en esta sesión (detalle en commits/ADRs)
+1. **Producto Genesis materializado** — `estoca/`: web clickeable (ver Stock derivado,
+   registrar movimiento, sin botón de "editar stock"), + safety net Vitest (9 tests) sobre
+   el invariante, con la historia rojo-a-verde del "contador mutable". Verificado:
+   `npm test` 9/9, build OK, dev server HTTP 200.
+2. **`showcase/`** — 3 accesos `.command` (abrir web / correr tests / ver pruebas manuales)
+   + README con tabla de artefactos QA por etapa.
+3. **Ficha #1 Stage 1 — control de versiones:** `git init` + repo GitHub. Todo el proyecto
+   como UN repo. `gh` autenticado como `santiagodeleon1411`; `gh auth setup-git` ya corrido
+   (git push funciona).
+4. **Ficha #2 Stage 1 — gate de merge:** PR obligatorio + `Protect main` ruleset [active]
+   + CI (GitHub Actions) que corre el safety net en cada PR. ADR-0004. **El check requerido
+   se llama `Estoca — safety net`.** PR #1 ya mergeado a `main`.
+
+## Decisión "público vs privado" (importante)
+- El branch protection **no existe en repos privados del plan free** (403: "Upgrade to Pro
+  or make public"). Para darle **dientes** al gate, el usuario eligió **hacer el repo
+  público**. Es reversible.
+- **COMPROMISO PENDIENTE DE CLAUDE:** avisarle proactivamente al usuario **si/ cuándo
+  conviene volver a privado** (ej.: si se agrega algo sensible, o si quiere "esconder" una
+  etapa a medio hacer antes de mostrarla a un recruiter puntual). Tenerlo presente.
+
+## Stack y herramientas del usuario (para recomendar en su lenguaje)
+- TS/JS **básico**, Playwright, GitHub, GitHub Actions. Cómodo con eso.
+- Instalado en la sesión: Node 22, npm, `gh` 2.96, Homebrew, git 2.55.
+- El producto usa Vite + Vitest (safety net). Playwright todavía NO entró (sería el primer
+  E2E cuando la UI se estabilice — ver watch-out en ADR-0003/0004).
 
 ## Preguntas abiertas (diferidas a propósito)
-- **Offline** (comercios con internet flojo): riesgo conocido, MVP es online-only, sin resolver.
+- **Offline** (comercios con internet flojo): MVP online-only, sin resolver.
 - Nombre "Estoca" sigue provisional.
 - Horizonte de "hasta dónde llega la simulación".
-- `CONTEXT.md` es v1 — el usuario iba a revisar términos con ojo de dueño del rubro (¿"Merchant" vs "Comercio"?).
 
 ## Suggested skills / tooling
-- **`/handoff`** — instalada en `.claude/skills/handoff/`. (Nota: no estaba registrada como comando invocable en la sesión que la creó; puede necesitar reiniciar Claude Code para que aparezca.)
-- Ninguna herramienta nueva de QA todavía — por diseño, es demasiado temprano. La próxima (framework de tests o Figma MCP) entra cuando una etapa lo justifique, explicando problema/encaje/costo.
-
-## Bootstrap analizado (referencia)
-Se revisó el bootstrap en `/Users/santiagodeleon/repos/bootstrap-skill/bootstrap-skills-main`. Es una metodología de *desarrollo* (Windows/PowerShell, DOMO/Zoho). NO instalar completo. Piezas de oro adoptadas/a adoptar: formato ADR + CONTEXT.md (ya adoptados), método grill-me/grill-with-docs. Para más adelante: tdd, review-loop, to-prd/to-issues cuando haya software real.
+- **`/handoff`** — este doc.
+- Próximas fichas naturales del Stage 1 (introducir de a UNA, con discusión previa):
+  **"definición de listo" + revisión humana** del ingeniero #2, **GitHub Issues** como
+  gestión de tareas coherente para 2 personas (crece a tablero cuando haga falta), y más
+  adelante el **primer Playwright E2E**. El **revisor de IA (Copilot)** quedó explícitamente
+  postergado: no conoce el invariante, no puede ser su guardián (ver ADR-0004).
+- Cuando toque tocar código del producto: `/run` (levantar la app) y `/code-review` sobre PRs.
 
 ---
 
-## ⏳ DECISIÓN PENDIENTE — Stage 1: elegir A, B o C
+## ⏳ DECISIÓN PENDIENTE — próxima ficha del Stage 1
 
-- **A) El primer cliente… y el primer bug en producción.** Primer comercio que paga; a los días, un descuadre real de stock. Stage 1 = primer incidente, cuánto proceso agregar. → *manejo de incidentes y riesgo.*
-- **B) Señales de que funciona: 5 comercios y piden más.** Aparece tracción (multi-sucursal, proveedores). Stage 1 = ¿cuándo vale la pena la primera automatización? → *escalar el producto.*
-- **C) Llega plata y llega gente: entra el ingeniero #2.** El equipo se duplica. Stage 1 = proteger el invariante cuando otros tocan el código (code review, definición de "listo"). → *escalar el equipo.*
+El gate protege el invariante de forma determinística. Pero quedan huecos que los tests
+NO cubren (diseño, contexto, legibilidad, cosas que el ingeniero #2 podría hacer distinto).
+**Preguntar al usuario cuál ficha sigue** — dejar que se comprometa primero:
+- **Revisión humana + "definición de listo"** (qué significa que un cambio está terminado
+  y listo para mergear, más allá de que el CI pase). ← candidato más natural.
+- **GitHub Issues** para gestionar el trabajo de los dos (evidencia de flujo de equipo real,
+  del tamaño real: 2 personas, no un sprint board inflado).
+- Otra que proponga el usuario.
+
+No railroad-ear: presentar el hueco, pedirle su postura y su porqué, después discutir.
