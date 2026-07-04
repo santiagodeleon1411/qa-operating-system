@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f HANDOFF.md ]; then printf '=== HANDOFF.md (read and resume from this before doing anything else) ===\\n\\n'; cat HANDOFF.md; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
