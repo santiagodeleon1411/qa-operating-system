@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm test *)",
+      "Bash(npm run *)",
+      "Bash(ls \"/Users/santiagodeleon/.claude/projects/-Users-santiagodeleon-repos-QA-Operating-System/memory/\")",
+      "Bash(cat \"/Users/santiagodeleon/.claude/projects/-Users-santiagodeleon-repos-QA-Operating-System/memory/MEMORY.md\")",
+      "Bash(chmod +x *.command)",
+      "Bash(awk '{print $1, $NF}')",
+      "Read(//Users/santiagodeleon/repos/**)"
+    ]
+  }
+}

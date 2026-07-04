@@ -1,0 +1,11 @@
+# Dependencies & build output
+node_modules/
+dist/
+
+# macOS
+.DS_Store
+
+# Local / editor
+*.local
+.vscode/
+.idea/
