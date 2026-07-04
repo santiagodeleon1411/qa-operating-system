@@ -69,6 +69,13 @@ Antes de responder, **mirá los artefactos** (existen, no los dupliques):
 - El producto usa Vite + Vitest (safety net). Playwright todavía NO entró (sería el primer
   E2E cuando la UI se estabilice — ver watch-out en ADR-0003/0004).
 
+## 🧹 Pendiente de higiene — HACER TEMPRANO al retomar
+- **Destrackear `.claude/settings.local.json`** (es config local/personal, no debería estar
+  versionada). Está en el repo desde el commit inicial y el repo es **PÚBLICO** → filtra rutas
+  con el usuario de macOS (`/Users/santiagodeleon/...`, PII de baja severidad). Fix liviano
+  (por PR): agregar `.claude/settings.local.json` al `.gitignore` + `git rm --cached` ese
+  archivo. **NO reescribir historia** salvo que el usuario lo pida (overkill para esta severidad).
+
 ## Preguntas abiertas (diferidas a propósito)
 - **Offline** (comercios con internet flojo): MVP online-only, sin resolver.
 - Nombre "Estoca" sigue provisional.
