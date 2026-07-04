@@ -7,5 +7,6 @@ dist/
 
 # Local / editor
 *.local
+.claude/settings.local.json
 .vscode/
 .idea/
