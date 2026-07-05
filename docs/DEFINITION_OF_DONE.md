@@ -1,78 +1,79 @@
 # Definition of Done — Estoca
 
-"Done" is not "it works on my machine." A change is **done** when both halves below hold.
-This document is alive: it is signed for today, not forever. When the product changes and
-a rule gets in the way, we change the rule.
+A change is **done** when both halves below hold. This document is expected to evolve as
+the product and team change.
 
-Everything here exists to protect one thing: **the Stock never lies.**
+Its single purpose is to protect the invariant: **the Stock never lies.**
 
 ---
 
-## Half 1 — Mechanical (the machine certifies this)
+## Half 1 — Automated (verified by CI)
 
-Already enforced by the merge gate ([ADR-0004](adr/0004-a-merge-gate-for-the-invariant.md)).
-No human needs to remember it:
+Enforced by the merge gate ([ADR-0004](adr/0004-a-merge-gate-for-the-invariant.md)). It
+requires no manual step:
 
-- The **safety net passes in CI** (`npm test`) — the invariant is intact on the paths we
-  already know to ask about.
+- The **safety net passes** (`npm test`) — the invariant holds on the paths currently
+  under test.
 - The build **type-checks** (`npm run build`).
 
-A green check answers this half. We do not re-verify it by hand.
+A green check satisfies this half. It is not re-verified by hand.
 
-## Half 2 — Human (a reviewer certifies this)
+## Half 2 — Human (certified by a reviewer)
 
-The machine only checks what we already knew to ask. A human guards the **blind spots** —
-what is new, what is design, what is understanding. In every PR the reviewer certifies:
+Automated checks only cover the cases already encoded in tests. A reviewer covers what
+they cannot: new code, design decisions, and comprehension. On every PR the reviewer
+certifies:
 
-1. **The invariant is respected in design, not just in the test.**
-   Stock is still *derived* from movements — no new counter, no second parallel
+1. **The invariant is respected by design, not only by the tests.**
+   Stock remains *derived* from movements — no new counter and no second parallel
    calculation. A new code path can pass the existing tests simply because they do not
-   touch it; only a human who understands the invariant sees a second source of truth.
+   exercise it; only a reviewer who understands the invariant can identify a second
+   source of truth.
 
-2. **New behavior brings its own test.**
-   CI stays green when you add an untested feature — the old tests still pass because no
-   one broke them. The reviewer confirms the safety net **grew** with the change, so we
-   did not open a blind spot exactly where we added something new.
+2. **New behavior is covered by a test.**
+   CI stays green when an untested feature is added, because the existing tests still
+   pass. The reviewer confirms the safety net was extended with the change, so no gap is
+   introduced where new behavior was added.
 
 3. **The reviewer understands what the change does and why.**
-   If the reviewer cannot explain the change in their own words, it is **not done** — it
-   is clarified or simplified before merging. Code that no one can explain in six months
-   is a maintenance time bomb, however green the check is.
+   If the reviewer cannot explain the change in their own words, it is not done and is
+   clarified or simplified before merging. Code that cannot be explained later is a
+   maintenance liability regardless of test status.
 
 ---
 
-## The review is mandatory
+## Review is mandatory
 
-A change reaches `main` only with **one human approval** — this is the human half of
-"done," and it is not optional.
+A change reaches `main` only with **one human approval**. This is the human half of
+"done" and is not optional.
 
-- **Enforcement:** the GitHub ruleset requires 1 approval on `main`. It is **armed the day
-  a second engineer's account joins the repo.** Enforcing a two-person rule on a
-  one-person repo would force a bypass on *every* merge, which rots the emergency valve
-  below into the normal front door. Until then this document is the standing norm; the
-  machine takes over the moment a real second reviewer exists.
+- **Enforcement:** the GitHub ruleset requires one approval on `main`. It is **activated
+  when a second engineer's account joins the repository.** GitHub does not permit
+  self-approval, so requiring an approval on a single-contributor repository would force a
+  bypass on every merge and remove the meaning of the exception below. Until a second
+  reviewer exists, this document is the operative standard; enforcement is applied once it
+  can function as intended.
 
-## The break-glass valve
-
-Like the little hammer behind the glass of a fire extinguisher: it exists for the real
-emergency, and **breaking it leaves a mark**. That visibility — not difficulty — is what
-keeps it from being abused.
+## Break-glass exception
 
 The repository admin may merge **without the required approval** only when **both**
 conditions hold:
 
-1. **Waiting causes real, present harm** — e.g. the Stock is lying in production *right
-   now* and a Merchant is acting on false numbers. Not "I'm in a hurry."
-2. **The reviewer is genuinely unavailable** — asleep, on leave, unreachable. Not "they
-   didn't answer in five minutes" (especially if you never pinged them). If the reviewer
-   is at hand, you do **not** break glass — you ask for a fast review.
+1. **Waiting causes real, present harm** — for example, the Stock is reporting incorrect
+   values in production and a Merchant is acting on them. Time pressure alone does not
+   qualify.
+2. **The reviewer is genuinely unavailable** — off-hours, on leave, or unreachable. A
+   delayed response is not unavailability, particularly if no request was sent. If the
+   reviewer is available, the exception does not apply; request an expedited review
+   instead.
 
-Both must hold. If either is missing, it is not break-glass: you either wait, or you get
-the quick review.
+Both conditions are required. If either is missing, the exception does not apply: either
+wait, or obtain the expedited review.
 
-When you break the glass, you owe two things:
+Using the exception carries two obligations:
 
-- **Write why in the PR** — the mark must be legible, not silent.
-- **Retroactive review** — the reviewer looks at it the moment they are back. A panic fix,
-  shipped fast with a Merchant bleeding, is the *most* likely change to carry a second
-  bug. The emergency buys speed; it does not forgive the review — it only delays it.
+- **State the reason in the PR.** The bypass is recorded explicitly.
+- **Obtain retroactive review.** The reviewer examines the change once available. An
+  emergency fix merged under pressure is the change most likely to introduce a second
+  defect; the emergency justifies merging before review, not omitting it. The review is
+  deferred, not waived.

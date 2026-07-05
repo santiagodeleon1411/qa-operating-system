@@ -1,58 +1,61 @@
-# ADR-0005 — Human review as the other half of "done," with a break-glass valve
+# ADR-0005 — Human review as the second half of "done," with a break-glass exception
 
 ## Status
 Accepted — 2026-07-06. Builds on [ADR-0004](0004-a-merge-gate-for-the-invariant.md), which
-kept human review as a *complementary* layer. This ADR gives that layer its shape.
+retained human review as a complementary layer. This ADR defines that layer.
 
 ## Context
-The merge gate (ADR-0004) answered only the **mechanical** half of "is this done?": CI is
-green, the invariant's safety net passed, the build type-checks. A machine can certify
-that — but only for the paths we already knew to ask about.
+The merge gate (ADR-0004) addressed only the **automated** half of "is this done?": CI is
+green, the invariant safety net passed, the build type-checks. Automation can certify
+that, but only for the cases already encoded in tests.
 
-The **human** half is still open, and it is exactly what surfaces when engineer #2 joins:
-Is the change understood? Does it respect the invariant *by design*, not just by passing
-tests a new path never touches? Did the new behavior bring its own test, or did we open a
-blind spot behind a green check? No machine sees these.
+The **human** half remains, and the arrival of a second engineer exposes it: Is the change
+understood? Does it respect the invariant *by design*, rather than only by passing tests
+that a new path does not exercise? Was the new behavior covered by a test, or was a gap
+introduced behind a green check? Automated checks do not address these.
 
 ## Decision
 Human review is **mandatory** — a change reaches `main` only with **one approval**. This is
-the second half of our [Definition of Done](../DEFINITION_OF_DONE.md), which names the
-three things a reviewer certifies (invariant-by-design, new-behavior-is-tested,
-reviewer-understands-it) and is guided into every PR by a pull-request template.
+the second half of the [Definition of Done](../DEFINITION_OF_DONE.md), which specifies the
+three items a reviewer certifies (invariant-by-design, new-behavior-is-tested,
+reviewer-understands-the-change) and is applied to every PR through a pull-request
+template.
 
-- **Enforcement is armed when engineer #2's account joins the repo.** GitHub does not let
-  you approve your own PR; requiring an approval on a one-person repo would force a bypass
-  on *every* merge — turning the emergency valve below into the normal front door and
-  rotting its meaning. Until a real second reviewer exists, the Definition of Done is the
-  standing norm; the ruleset takes over the moment it can bite honestly.
+- **Enforcement is activated when the second engineer's account joins the repository.**
+  GitHub does not permit self-approval; requiring an approval on a single-contributor
+  repository would force a bypass on every merge and remove the meaning of the exception
+  below. Until a second reviewer exists, the Definition of Done is the operative standard;
+  the ruleset is applied once it can be enforced as intended.
 
-- **Break-glass valve (visible bypass).** The repository admin may merge without the
-  required approval only when **both** hold: (1) waiting causes real, present harm, **and**
-  (2) the reviewer is genuinely unavailable. The break is recorded, its reason written in
-  the PR, and the change gets **retroactive review** — because a panic fix is the change
-  most likely to carry a second bug. Speed is bought; the review is delayed, not forgiven.
+- **Break-glass exception.** The repository admin may merge without the required approval
+  only when **both** conditions hold: (1) waiting causes real, present harm, **and** (2)
+  the reviewer is genuinely unavailable. The bypass is recorded, its reason stated in the
+  PR, and the change receives **retroactive review**, because an emergency fix is the
+  change most likely to introduce a second defect. Merging precedes review; the review is
+  deferred, not omitted.
 
 ## Considered options
-- **Review as a norm, not a gate** — rejected as the primary rule: norms without teeth
-  erode under pressure, exactly when review matters most. We build the obligation early so
-  it becomes culture before habits set. (It *is* the norm in the window before enforcement
-  arms — by necessity, not by choice.)
-- **No valve — pure discipline** — rejected: with only two people, your one reviewer will
-  eventually be unavailable during a real emergency; a rule that ignores that reality
-  breaks itself, and the pressure produces a rubber-stamp approval anyway.
-- **Wide bypass / self-merge allowed** — rejected: on a two-person team this is
-  indistinguishable from having no gate.
-- **Trigger break-glass on "invariant broken" alone** — rejected as incomplete: a broken
-  invariant justifies the *speed*, but if the reviewer is sitting next to you, skipping
-  them is skipping review for no reason. The valve needs *both* conditions.
+- **Review as a norm rather than a gate** — rejected as the primary rule: an unenforced
+  norm erodes under pressure, which is when review matters most. The obligation is
+  established early so it becomes standard practice before habits form. It operates as a
+  norm only in the interval before enforcement is activated, by necessity.
+- **No exception — strict enforcement** — rejected: with two people, the single reviewer
+  will eventually be unavailable during a genuine emergency; a rule that ignores this
+  fails in practice and produces a nominal approval under pressure.
+- **Broad bypass or self-merge** — rejected: on a two-person team this is equivalent to
+  having no gate.
+- **Trigger the exception on a broken invariant alone** — rejected as incomplete: a broken
+  invariant justifies the urgency, but if the reviewer is available, skipping the review is
+  unjustified. Both conditions are required.
 
 ## Consequences
-- "Done" now has both halves: the machine guards the paths we know; the human guards the
-  blind spots — new code, design, and understanding.
-- The break-glass keeps us from ever being trapped by an absent reviewer during a real
-  emergency, while the recorded mark keeps the exit from swallowing the discipline.
-- Watch-out: enforcement is documentation-only until engineer #2's account exists. The
-  value in the meantime is the Definition of Done and the PR template shaping behavior;
-  the mechanical bite is deferred deliberately, not forgotten.
-- The valve depends on honesty — the glass *can* be broken out of laziness. The mark makes
-  that visible; if we ever see it abused, revisit the bypass scope.
+- "Done" now has both halves: automation covers the encoded cases; the reviewer covers new
+  code, design, and comprehension.
+- The break-glass exception prevents an absent reviewer from blocking a genuine emergency,
+  while the recorded justification prevents the exception from displacing the review
+  requirement.
+- Enforcement is documentation-only until the second engineer's account exists. The value
+  in the interim is the Definition of Done and the PR template guiding behavior; mechanical
+  enforcement is deferred deliberately.
+- The exception depends on honest use. The recorded justification makes any misuse visible;
+  if misuse occurs, the bypass scope is revisited.
