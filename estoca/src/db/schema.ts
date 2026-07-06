@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { PRODUCTS } from '../persistence';
+import { PRODUCTS } from '../catalogue';
 
 // The database schema for Estoca, per docs/adr/0006. Stock is never stored — only the
 // movements are. Stock is derived from them by the `product_stock` view. A value that is

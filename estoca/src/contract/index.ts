@@ -20,10 +20,11 @@ export const movementKind = z.enum(['entry', 'exit']);
  * in another timezone, and in an append-only ledger "when" is not a value to trust to the
  * caller). The domain rules are mirrored here so a malformed request is refused at the edge.
  */
+const quantityRule = 'Una cantidad debe ser un número entero positivo.';
 export const movementInput = z.object({
-  productId: z.string().min(1),
+  productId: z.string().min(1, 'Falta indicar el Product.'),
   kind: movementKind,
-  quantity: z.number().int().positive(),
+  quantity: z.number({ error: quantityRule }).int(quantityRule).positive(quantityRule),
   reason: z.string().refine((s) => s.trim().length > 0, 'Un movimiento debe registrar un motivo.'),
 });
 export type MovementInput = z.infer<typeof movementInput>;
