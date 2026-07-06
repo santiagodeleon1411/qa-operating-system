@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fetchProducts, recordMovement, MovementRefused } from './client';
+import { fetchProducts, recordMovement, recordAdjustment, MovementRefused } from './client';
 
 // A fake transport so the client is tested without a live server: it returns exactly what
 // the backend would put on the wire, letting us assert how the client validates it.
@@ -50,5 +50,36 @@ describe('the client records movements and surfaces refusals', () => {
     );
     await expect(refused).rejects.toBeInstanceOf(MovementRefused);
     await expect(refused).rejects.toThrow('negativo');
+  });
+});
+
+describe('the client maps each adjustment outcome to a typed result', () => {
+  const input = { productId: 'p-cafe', counted: 39, reason: 'rotura', expectedStock: 42 };
+
+  it('returns "recorded" with the movement on a 201', async () => {
+    const out = await recordAdjustment(
+      input,
+      transport(201, {
+        adjusted: true,
+        movement: { productId: 'p-cafe', kind: 'exit', quantity: 3, reason: 'rotura', at: '2026-07-06T00:00:00.000Z' },
+      }),
+    );
+    expect(out).toMatchObject({ kind: 'recorded', movement: { quantity: 3 } });
+  });
+
+  it('returns "unchanged" when the count matched (200)', async () => {
+    const out = await recordAdjustment(input, transport(200, { adjusted: false }));
+    expect(out.kind).toBe('unchanged');
+  });
+
+  it('returns "stale" with the current Stock on a 409', async () => {
+    const out = await recordAdjustment(input, transport(409, { error: 'cambió', currentStock: 41 }));
+    expect(out).toEqual({ kind: 'stale', currentStock: 41 });
+  });
+
+  it('raises MovementRefused on a 422', async () => {
+    await expect(recordAdjustment(input, transport(422, { error: 'Un conteo no puede ser negativo.' }))).rejects.toBeInstanceOf(
+      MovementRefused,
+    );
   });
 });

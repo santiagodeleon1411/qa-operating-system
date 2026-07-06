@@ -74,3 +74,37 @@ export function wouldGoNegative(
   const delta = movement.kind === 'entry' ? movement.quantity : -movement.quantity;
   return current + delta < 0;
 }
+
+/**
+ * Turn a physical count into the movement that reconciles the ledger to it — never into a
+ * stored Stock. The Merchant enters the absolute number they counted; this records the
+ * DIFFERENCE against the Stock seen when the count began (`snapshotStock`) as one adjustment
+ * movement. Measuring the difference from the count (not from a later moment) keeps
+ * legitimate movements made during the count correct. See docs/specs/stock-count-adjustment.md.
+ *
+ * Returns `null` when the count already matches — a movement that changes nothing is not
+ * recorded. Throws when the count is not a whole, non-negative number of units.
+ */
+export function planAdjustment(input: {
+  productId: string;
+  counted: number;
+  snapshotStock: number;
+  reason: string;
+  at: string;
+}): StockMovement | null {
+  if (!Number.isInteger(input.counted)) {
+    throw new Error('Las unidades se cuentan en números enteros.');
+  }
+  if (input.counted < 0) {
+    throw new Error('Un conteo no puede ser negativo.');
+  }
+  const delta = input.counted - input.snapshotStock;
+  if (delta === 0) return null; // the count matches the system; nothing to adjust
+  return makeMovement({
+    productId: input.productId,
+    kind: delta > 0 ? 'entry' : 'exit',
+    quantity: Math.abs(delta),
+    reason: input.reason,
+    at: input.at,
+  });
+}
