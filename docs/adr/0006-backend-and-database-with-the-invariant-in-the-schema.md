@@ -30,11 +30,13 @@ represented.
   truth. Rows are only inserted, never updated or deleted.
 - **Stock is never stored.** There is no Stock column. Stock is derived from the movements
   by query, exposed as a database view. A value that is not stored cannot drift.
-- **Write-time guards move into the schema** where they are single-row rules: a positive
-  whole quantity and a non-empty reason become `CHECK` constraints, and `kind` is
-  constrained to the known movement kinds. The cross-row rule — Stock may never go
-  negative — cannot be a single-row constraint and remains a guard on the write path (see
-  Consequences: concurrency).
+- **Write-time guards live in the schema.** The single-row rules become `CHECK`
+  constraints: a positive whole quantity, a non-empty reason, and a `kind` limited to the
+  known movement kinds. The cross-row rule — Stock may never go negative — cannot be a
+  single-row constraint, so it is enforced by a trigger (`movements_no_negative_stock`)
+  that rejects an exit larger than the current derived Stock. Because it is in the schema,
+  the guarantee holds against any writer, including raw SQL that bypasses the application
+  (see Consequences: concurrency).
 - **No caching of the derived value yet.** Materialising or caching the Stock count is
   deferred until scale justifies it; at a Merchant's catalogue size, deriving on read is
   negligible, and a cache would reintroduce the drift risk this decision exists to remove.
@@ -67,6 +69,16 @@ SELECT p.id AS product_id,
 FROM products p
 LEFT JOIN movements m ON m.product_id = p.id
 GROUP BY p.id;
+
+-- The never-negative rule, enforced in the schema: an exit larger than the current derived
+-- Stock is refused, whatever writer attempts it. This closes the concurrency window.
+CREATE TRIGGER movements_no_negative_stock
+BEFORE INSERT ON movements
+WHEN NEW.kind = 'exit'
+ AND (SELECT stock FROM product_stock WHERE product_id = NEW.product_id) < NEW.quantity
+BEGIN
+  SELECT RAISE(ABORT, 'Una salida no puede dejar el Stock en negativo.');
+END;
 ```
 
 ### Guardianship across the boundary
@@ -98,12 +110,13 @@ The invariant is defended in layers, each with a clear owner:
 - The invariant, the safety net, and the Definition of Done **extend** to the new
   architecture rather than being replaced. The same principle now holds across a service
   and a database boundary.
-- **Concurrency is a new failure mode.** The "Stock never goes negative" guard reads the
-  current derived Stock before accepting an exit. With concurrent writes, two exits can
-  each read the same Stock, both pass the check, and together drive it negative — a race
-  that a single-threaded browser never had. The safety net and the write path must now
-  address this (e.g. a serialised write or a transactional check); it is the clearest
-  example of the risk moving to the backend.
+- **Concurrency is a new failure mode, addressed in the schema.** An application-level
+  guard that reads the current Stock and then writes leaves a window: two concurrent exits
+  can each read the same Stock, both pass the check, and together drive it negative — a
+  race a single-threaded browser never had. Placing the guard in the schema trigger closes
+  the window, because the database evaluates the current Stock at the moment of each write.
+  The safety net verifies this with a test that bypasses the repository and writes raw SQL,
+  proving the guarantee does not depend on the application reading carefully.
 - New surface to manage: schema migrations, and a contract between frontend and backend so
   they do not drift. Each is a candidate for a later decision, introduced when its own
   cost is justified — not pre-built here.
