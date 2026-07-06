@@ -24,7 +24,12 @@ function renderLoading(): void {
 function renderUnavailable(): void {
   app.innerHTML = `${header()}
     <section class="panel">
-      <p class="error" role="alert">No se pudo contactar al backend. Verificá que esté corriendo (<code>npm run dev:api</code>) y reintentá.</p>
+      <p class="error" role="alert">
+        No pudimos cargar tu stock en este momento. Suele ser un problema temporal de
+        conexión — <strong>tus datos están guardados, no se perdió nada.</strong>
+        Revisá tu conexión a internet y reintentá en unos segundos. Si el problema sigue,
+        escribinos a soporte.
+      </p>
       <button id="retry" type="button">Reintentar</button>
     </section>`;
   document.querySelector<HTMLButtonElement>('#retry')!.addEventListener('click', load);
@@ -103,7 +108,9 @@ async function onSubmit(e: SubmitEvent): Promise<void> {
   } catch (err) {
     // A refused movement carries the backend's reason; anything else is a transport failure.
     errorEl.textContent =
-      err instanceof MovementRefused ? err.message : 'No se pudo registrar el movimiento. Reintentá.';
+      err instanceof MovementRefused
+        ? err.message
+        : 'No pudimos registrar el movimiento. Revisá tu conexión y probá de nuevo — no se guardó nada, así que podés reintentar sin duplicar.';
   }
 }
 
