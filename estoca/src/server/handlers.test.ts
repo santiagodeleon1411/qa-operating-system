@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createDb } from '../db/schema';
 import { MovementsRepo } from '../db/movements-repo';
-import { getProducts, postMovement } from './handlers';
-import { productsResponse, movement, errorResponse } from '../contract';
+import { getProducts, postMovement, postAdjustment } from './handlers';
+import { productsResponse, movement, errorResponse, adjustmentResult, staleCount } from '../contract';
 
 const at = '2026-07-06T00:00:00.000Z';
 
@@ -73,6 +73,85 @@ describe('POST /movements honors the contract on both edges', () => {
     expect(res.status).toBe(422);
     expect(() => errorResponse.parse(res.body)).not.toThrow();
     expect(repo.deriveStock('p-cafe')).toBe(3); // the exit never landed
+  });
+});
+
+describe('POST /adjustments reconciles a physical count without ever storing Stock', () => {
+  let repo: MovementsRepo;
+  beforeEach(() => {
+    repo = new MovementsRepo(createDb());
+    // Café starts at 42 in the ledger.
+    repo.recordMovement({ productId: 'p-cafe', kind: 'entry', quantity: 42, reason: 'compra', at });
+  });
+
+  const count = (body: Record<string, unknown>) => postAdjustment(repo, body, at);
+
+  it('records a downward adjustment when the count is below the system', () => {
+    const res = count({ productId: 'p-cafe', counted: 39, reason: 'rotura', expectedStock: 42 });
+    expect(res.status).toBe(201);
+    const parsed = adjustmentResult.parse(res.body);
+    expect(parsed).toMatchObject({ adjusted: true, movement: { kind: 'exit', quantity: 3 } });
+    expect(repo.deriveStock('p-cafe')).toBe(39);
+  });
+
+  it('records an upward adjustment when the count is above the system', () => {
+    const res = count({ productId: 'p-cafe', counted: 50, reason: 'error de carga', expectedStock: 42 });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ adjusted: true, movement: { kind: 'entry', quantity: 8 } });
+    expect(repo.deriveStock('p-cafe')).toBe(50);
+  });
+
+  it('records nothing when the count already matches the system', () => {
+    const res = count({ productId: 'p-cafe', counted: 42, reason: 'conteo', expectedStock: 42 });
+    expect(res.status).toBe(200);
+    expect(adjustmentResult.parse(res.body)).toEqual({ adjusted: false });
+    expect(repo.deriveStock('p-cafe')).toBe(42); // untouched
+  });
+
+  it('accepts a count of zero as a valid adjustment down to zero', () => {
+    const res = count({ productId: 'p-cafe', counted: 0, reason: 'sin stock', expectedStock: 42 });
+    expect(res.status).toBe(201);
+    expect(repo.deriveStock('p-cafe')).toBe(0);
+  });
+
+  it('refuses a negative count, a non-whole count, and a missing reason at the boundary', () => {
+    for (const bad of [
+      { productId: 'p-cafe', counted: -3, reason: 'x', expectedStock: 42 },
+      { productId: 'p-cafe', counted: 3.5, reason: 'x', expectedStock: 42 },
+      { productId: 'p-cafe', counted: 39, reason: '  ', expectedStock: 42 },
+    ]) {
+      const res = count(bad);
+      expect(res.status).toBe(422);
+      expect(() => errorResponse.parse(res.body)).not.toThrow();
+    }
+    expect(repo.deriveStock('p-cafe')).toBe(42); // nothing reached the ledger
+  });
+
+  it('surfaces a Stock change during the count and measures the difference from the count', () => {
+    // A sale of 1 lands while the Merchant is counting: system goes 42 -> 41.
+    repo.recordMovement({ productId: 'p-cafe', kind: 'exit', quantity: 1, reason: 'venta', at });
+
+    // First submit: the Stock no longer matches what the count began with. Warn, record nothing.
+    const warned = count({ productId: 'p-cafe', counted: 39, reason: 'rotura', expectedStock: 42 });
+    expect(warned.status).toBe(409);
+    expect(staleCount.parse(warned.body).currentStock).toBe(41);
+    expect(repo.deriveStock('p-cafe')).toBe(41); // nothing recorded yet
+
+    // Merchant reconfirms. The discrepancy is measured from the count (39 vs 42 = 3), applied
+    // on top of the sale, landing the true 38 on the shelf — not 39.
+    const confirmed = count({ productId: 'p-cafe', counted: 39, reason: 'rotura', expectedStock: 42, confirmed: true });
+    expect(confirmed.status).toBe(201);
+    expect(confirmed.body).toMatchObject({ adjusted: true, movement: { kind: 'exit', quantity: 3 } });
+    expect(repo.deriveStock('p-cafe')).toBe(38);
+  });
+
+  it('lets the never-negative trigger refuse an adjustment that would drive Stock below zero', () => {
+    // Sales drop the real Stock to 2 during the count; the Merchant reconfirms a count of 0
+    // taken against the original 42, which would apply an exit of 42 onto a Stock of 2.
+    repo.recordMovement({ productId: 'p-cafe', kind: 'exit', quantity: 40, reason: 'venta', at }); // 42 -> 2
+    const res = count({ productId: 'p-cafe', counted: 0, reason: 'sin stock', expectedStock: 42, confirmed: true });
+    expect(res.status).toBe(422);
+    expect(repo.deriveStock('p-cafe')).toBe(2); // the schema backstop held
   });
 });
 

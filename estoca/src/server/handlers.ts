@@ -10,13 +10,17 @@
 // cannot silently drift from the shape the frontend was promised.
 
 import type { MovementsRepo } from '../db/movements-repo';
+import { planAdjustment } from '../domain';
 import {
   movementInput,
+  adjustmentInput,
   productsResponse,
   movement as movementSchema,
   type Movement,
   type ProductView,
   type ErrorResponse,
+  type AdjustmentResult,
+  type StaleCount,
 } from '../contract';
 
 export interface HandlerResult<T> {
@@ -59,6 +63,44 @@ export function postMovement(
     // The server is authoritative on time (ADR-0007): the caller does not send `at`.
     const created = repo.recordMovement({ ...parsed.data, at: now });
     return { status: 201, body: movementSchema.parse(created) };
+  } catch (e) {
+    return { status: 422, body: { error: (e as Error).message } };
+  }
+}
+
+/**
+ * `POST /adjustments` — reconcile a Product to a physical count. Records the difference from
+ * the count-time Stock as a movement; never stores the counted number.
+ * - `409` when the Stock changed since the count began and the Merchant has not reconfirmed.
+ * - `200 { adjusted: false }` when the count matches — nothing to record.
+ * - `422` for an invalid count/reason, or if the never-negative trigger refuses the result.
+ */
+export function postAdjustment(
+  repo: MovementsRepo,
+  rawBody: unknown,
+  now: string = new Date().toISOString(),
+): HandlerResult<AdjustmentResult | StaleCount | ErrorResponse> {
+  const parsed = adjustmentInput.safeParse(rawBody);
+  if (!parsed.success) {
+    return { status: 422, body: { error: firstIssue(parsed.error) } };
+  }
+  const { productId, counted, reason, expectedStock, confirmed } = parsed.data;
+
+  // Detect a Stock change during the count. The difference is still measured from the count
+  // (expectedStock), so once reconfirmed the recorded adjustment stays correct.
+  const currentStock = repo.deriveStock(productId);
+  if (!confirmed && currentStock !== expectedStock) {
+    return {
+      status: 409,
+      body: { error: 'El Stock cambió desde que empezó el conteo.', currentStock },
+    };
+  }
+
+  try {
+    const movement = planAdjustment({ productId, counted, snapshotStock: expectedStock, reason, at: now });
+    if (movement === null) return { status: 200, body: { adjusted: false } };
+    const created = repo.recordMovement(movement);
+    return { status: 201, body: { adjusted: true, movement: movementSchema.parse(created) } };
   } catch (e) {
     return { status: 422, body: { error: (e as Error).message } };
   }

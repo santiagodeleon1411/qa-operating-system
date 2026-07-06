@@ -12,7 +12,7 @@
 import http from 'node:http';
 import { createDb } from '../db/schema';
 import { MovementsRepo } from '../db/movements-repo';
-import { getProducts, postMovement } from './handlers';
+import { getProducts, postMovement, postAdjustment } from './handlers';
 
 const repo = new MovementsRepo(createDb());
 
@@ -45,6 +45,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && req.url === '/movements') {
       const { status, body } = postMovement(repo, await readBody(req));
+      return send(res, status, body);
+    }
+    if (req.method === 'POST' && req.url === '/adjustments') {
+      const { status, body } = postAdjustment(repo, await readBody(req));
       return send(res, status, body);
     }
     send(res, 404, { error: 'No existe ese recurso.' });

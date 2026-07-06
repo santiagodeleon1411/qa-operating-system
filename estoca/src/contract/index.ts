@@ -63,3 +63,34 @@ export type ProductsResponse = z.infer<typeof productsResponse>;
  */
 export const errorResponse = z.object({ error: z.string().min(1) });
 export type ErrorResponse = z.infer<typeof errorResponse>;
+
+/**
+ * The body of `POST /adjustments`: reconcile a Product to a physical count. The Merchant
+ * sends the absolute number they COUNTED, plus the Stock they saw when the count began
+ * (`expectedStock`) so the server can measure the difference from that moment and detect a
+ * Stock change during the count. The server never stores the counted number — it records
+ * the difference as a movement. `counted`'s range (whole, non-negative) is enforced in the
+ * domain, with the domain's messages. See docs/specs/stock-count-adjustment.md.
+ */
+export const adjustmentInput = z.object({
+  productId: z.string().min(1, 'Falta indicar el Product.'),
+  counted: z.number(),
+  reason: z.string().refine((s) => s.trim().length > 0, 'Un movimiento debe registrar un motivo.'),
+  expectedStock: z.number().int(),
+  confirmed: z.boolean().optional(),
+});
+export type AdjustmentInput = z.infer<typeof adjustmentInput>;
+
+/** `POST /adjustments` outcome: either the adjustment was recorded, or the count matched. */
+export const adjustmentResult = z.discriminatedUnion('adjusted', [
+  z.object({ adjusted: z.literal(true), movement }),
+  z.object({ adjusted: z.literal(false) }),
+]);
+export type AdjustmentResult = z.infer<typeof adjustmentResult>;
+
+/**
+ * The body returned when the Stock changed between the count beginning and its submission.
+ * The Merchant is asked to reconfirm; `currentStock` lets the screen show what it is now.
+ */
+export const staleCount = z.object({ error: z.string().min(1), currentStock: z.number().int() });
+export type StaleCount = z.infer<typeof staleCount>;

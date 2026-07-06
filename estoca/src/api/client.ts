@@ -10,9 +10,12 @@ import {
   productsResponse,
   movement as movementSchema,
   errorResponse,
+  adjustmentResult,
+  staleCount,
   type ProductView,
   type MovementInput,
   type Movement,
+  type AdjustmentInput,
 } from '../contract';
 
 // Same-origin path: Vite proxies /api to the backend process in dev (see vite.config.ts),
@@ -42,5 +45,30 @@ export async function recordMovement(input: MovementInput, f: typeof fetch = fet
   const json = await res.json();
   if (res.status === 201) return movementSchema.parse(json);
   // A refusal still arrives in the contract's typed error shape.
+  throw new MovementRefused(errorResponse.parse(json).error);
+}
+
+/** The outcome of a physical-count adjustment. `stale` asks the Merchant to reconfirm. */
+export type AdjustmentOutcome =
+  | { kind: 'recorded'; movement: Movement }
+  | { kind: 'unchanged' }
+  | { kind: 'stale'; currentStock: number };
+
+/**
+ * `POST /adjustments` — reconcile a Product to a physical count. Returns the outcome; throws
+ * `MovementRefused` when the count/reason is invalid or the result would make Stock negative.
+ */
+export async function recordAdjustment(input: AdjustmentInput, f: typeof fetch = fetch): Promise<AdjustmentOutcome> {
+  const res = await f(`${BASE}/adjustments`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const json = await res.json();
+  if (res.status === 409) return { kind: 'stale', currentStock: staleCount.parse(json).currentStock };
+  if (res.status === 201 || res.status === 200) {
+    const result = adjustmentResult.parse(json);
+    return result.adjusted ? { kind: 'recorded', movement: result.movement } : { kind: 'unchanged' };
+  }
   throw new MovementRefused(errorResponse.parse(json).error);
 }
