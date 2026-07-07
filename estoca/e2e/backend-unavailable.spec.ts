@@ -13,8 +13,9 @@ test('when the backend is unreachable, the Merchant sees a reassuring message an
 }) => {
   // Scoped to the backend endpoints only. A broad '**/api/**' would also abort Vite's dev
   // module `src/api/client.ts` (served over HTTP with `/api/` in its path), breaking the app
-  // itself instead of simulating an unreachable backend.
-  await page.route(/\/api\/(products|movements|adjustments)/, (route) => route.abort());
+  // itself instead of simulating an unreachable backend. `/me` is included because boot() asks
+  // it first — with it aborted, the app cannot even tell whether there is a session.
+  await page.route(/\/api\/(me|login|logout|products|movements|adjustments)/, (route) => route.abort());
 
   await estoca.open();
 

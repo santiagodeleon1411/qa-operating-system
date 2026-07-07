@@ -1,50 +1,92 @@
-// Estoca — the frontend's client for the backend. See docs/adr/0007.
+// Estoca — the frontend's client for the backend. See docs/adr/0007 and docs/adr/0008.
 //
-// This is the frontend's side of the contract. Every response the backend sends is
-// validated here against the SAME schema the backend validated it against on the way out.
-// If the backend ever drifts from the agreed shape, this parse throws instead of letting a
-// malformed payload be silently mis-read by the screen — the drift is caught at the edge,
-// on this side too.
+// This is the frontend's side of the contract. Every response the backend sends is validated
+// here against the SAME schema the backend validated it against on the way out, so drift is
+// caught at the edge on this side too. The session travels as an httpOnly cookie the browser
+// attaches automatically; this code never sees or handles the token.
 
 import {
   productsResponse,
+  movementsResponse,
   movement as movementSchema,
   errorResponse,
   adjustmentResult,
   staleCount,
+  credentials as credentialsSchema,
+  sessionUser as sessionUserSchema,
   type ProductView,
-  type MovementInput,
   type Movement,
+  type MovementInput,
   type AdjustmentInput,
+  type Credentials,
+  type SessionUser,
 } from '../contract';
 
-// Same-origin path: Vite proxies /api to the backend process in dev (see vite.config.ts),
-// so the browser never makes a cross-origin request and no CORS handling is needed.
+// Same-origin path: Vite proxies /api to the backend process in dev (see vite.config.ts).
 const BASE = '/api';
+
+// `same-origin` sends the session cookie on every request (the default, made explicit).
+const send = (path: string, init?: RequestInit): Promise<Response> =>
+  fetch(`${BASE}${path}`, { credentials: 'same-origin', ...init });
+
+const jsonPost = (path: string, body: unknown): Promise<Response> =>
+  send(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
 /** Raised when the backend refuses a movement (a domain rule or the never-negative trigger). */
 export class MovementRefused extends Error {}
 
-/** `GET /products` — the catalogue with Stock derived by the backend. */
-export async function fetchProducts(f: typeof fetch = fetch): Promise<ProductView[]> {
-  const res = await f(`${BASE}/products`);
+/** Raised when a request needs a session and there is none (HTTP 401). */
+export class NotAuthenticated extends Error {}
+
+// --- Identity -------------------------------------------------------------------------------
+
+/** `POST /login` — returns the user on success; throws NotAuthenticated on bad credentials. */
+export async function login(input: Credentials): Promise<SessionUser> {
+  const res = await jsonPost('/login', credentialsSchema.parse(input));
+  const json = await res.json();
+  if (res.ok) return sessionUserSchema.parse(json);
+  throw new NotAuthenticated(errorResponse.parse(json).error);
+}
+
+/** `POST /logout` — end the session. */
+export async function logout(): Promise<void> {
+  await send('/logout', { method: 'POST' });
+}
+
+/** `GET /me` — the current user, or null when there is no valid session. */
+export async function fetchMe(): Promise<SessionUser | null> {
+  const res = await send('/me');
+  if (res.status === 401) return null;
+  return sessionUserSchema.parse(await res.json());
+}
+
+// --- Stock ----------------------------------------------------------------------------------
+
+/** `GET /products` — throws NotAuthenticated on 401, so the UI can show the login screen. */
+export async function fetchProducts(): Promise<ProductView[]> {
+  const res = await send('/products');
+  if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
   if (!res.ok) throw new Error(`El backend respondió ${res.status} al pedir el stock.`);
   return productsResponse.parse(await res.json());
+}
+
+/** `GET /movements` — the recent ledger, each movement carrying who recorded it. */
+export async function fetchMovements(): Promise<Movement[]> {
+  const res = await send('/movements');
+  if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
+  if (!res.ok) throw new Error(`El backend respondió ${res.status} al pedir el historial.`);
+  return movementsResponse.parse(await res.json());
 }
 
 /**
  * `POST /movements` — record a movement. Returns the created movement on success; throws
  * `MovementRefused` with the backend's message when the movement is refused (HTTP 422).
  */
-export async function recordMovement(input: MovementInput, f: typeof fetch = fetch): Promise<Movement> {
-  const res = await f(`${BASE}/movements`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(input),
-  });
+export async function recordMovement(input: MovementInput): Promise<Movement> {
+  const res = await jsonPost('/movements', input);
   const json = await res.json();
   if (res.status === 201) return movementSchema.parse(json);
-  // A refusal still arrives in the contract's typed error shape.
+  if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
   throw new MovementRefused(errorResponse.parse(json).error);
 }
 
@@ -58,17 +100,14 @@ export type AdjustmentOutcome =
  * `POST /adjustments` — reconcile a Product to a physical count. Returns the outcome; throws
  * `MovementRefused` when the count/reason is invalid or the result would make Stock negative.
  */
-export async function recordAdjustment(input: AdjustmentInput, f: typeof fetch = fetch): Promise<AdjustmentOutcome> {
-  const res = await f(`${BASE}/adjustments`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(input),
-  });
+export async function recordAdjustment(input: AdjustmentInput): Promise<AdjustmentOutcome> {
+  const res = await jsonPost('/adjustments', input);
   const json = await res.json();
   if (res.status === 409) return { kind: 'stale', currentStock: staleCount.parse(json).currentStock };
   if (res.status === 201 || res.status === 200) {
     const result = adjustmentResult.parse(json);
     return result.adjusted ? { kind: 'recorded', movement: result.movement } : { kind: 'unchanged' };
   }
+  if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
   throw new MovementRefused(errorResponse.parse(json).error);
 }

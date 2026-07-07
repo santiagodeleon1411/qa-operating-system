@@ -29,15 +29,45 @@ export const movementInput = z.object({
 });
 export type MovementInput = z.infer<typeof movementInput>;
 
-/** A recorded movement, as the server returns it. `at` is the server-stamped ISO time. */
+/**
+ * A recorded movement, as the server returns it. `at` is the server-stamped ISO time, and
+ * `actorId`/`actorName` name the authenticated user who recorded it (ADR-0008). The actor is
+ * assigned server-side from the session, never sent by the caller — like `at`, "who" is not a
+ * value trusted to the client.
+ */
 export const movement = z.object({
   productId: z.string().min(1),
   kind: movementKind,
   quantity: z.number().int().positive(),
   reason: z.string().min(1),
+  actorId: z.string().min(1),
+  actorName: z.string().min(1),
   at: z.iso.datetime(),
 });
 export type Movement = z.infer<typeof movement>;
+
+/** The body of `GET /movements`: the recent ledger, most recent first, each with its actor. */
+export const movementsResponse = z.array(movement);
+export type MovementsResponse = z.infer<typeof movementsResponse>;
+
+/** The body of `POST /login`: the credentials a user submits. */
+export const credentials = z.object({
+  username: z.string().min(1, 'Falta el usuario.'),
+  password: z.string().min(1, 'Falta la contraseña.'),
+});
+export type Credentials = z.infer<typeof credentials>;
+
+/**
+ * A user as it is safe to expose — the body of `POST /login` (on success) and `GET /me`.
+ * Never carries the password hash; the session token travels only in an httpOnly cookie, out
+ * of reach of client JavaScript, and never appears in a body.
+ */
+export const sessionUser = z.object({
+  id: z.string().min(1),
+  username: z.string().min(1),
+  name: z.string().min(1),
+});
+export type SessionUser = z.infer<typeof sessionUser>;
 
 /**
  * A Product as shown on the shelf. `stock` and `stockout` are DERIVED server-side and are

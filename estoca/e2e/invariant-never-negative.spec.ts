@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { PRODUCTS } from './estoca-page';
+import { PRODUCTS, LOGINS } from './estoca-page';
 
 // The invariant Estoca exists to keep — "the Stock never lies" — proven through the real
 // stack. An exit larger than what is on the shelf must be refused, the Merchant must see why,
@@ -7,7 +7,7 @@ import { PRODUCTS } from './estoca-page';
 // (ADR-0006), travels back through the contract as a typed error, and lands as a message on
 // the screen; this test is the only one that exercises that whole path at once.
 test('an exit larger than the Stock is refused and leaves the Stock untouched', async ({ estoca }) => {
-  await estoca.goto();
+  await estoca.login(LOGINS.ana.username, LOGINS.ana.password);
   const before = await estoca.stockOf(PRODUCTS.azucar);
 
   // One more than exists — impossible to satisfy without going negative, whatever the baseline.

@@ -145,3 +145,22 @@ button:hover {
   font-size: 0.9rem;
   min-height: 1.2em;
 }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.topbar button {
+  margin-top: 0;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-weight: 600;
+}
+
+td.actor {
+  color: var(--muted);
+}

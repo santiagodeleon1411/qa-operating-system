@@ -1,12 +1,12 @@
 import { test, expect } from './fixtures';
-import { PRODUCTS } from './estoca-page';
+import { PRODUCTS, LOGINS } from './estoca-page';
 
 // The core loop of the product, end to end through the real stack: the Merchant records a
 // movement and the derived Stock on the shelf reflects it — no more, no less. Asserted as a
 // delta from the Stock this test found on arrival, so accumulated state from earlier tests
 // cannot make it pass or fail by accident.
 test('an entry raises the derived Stock by exactly the quantity recorded', async ({ estoca }) => {
-  await estoca.goto();
+  await estoca.login(LOGINS.ana.username, LOGINS.ana.password);
   const before = await estoca.stockOf(PRODUCTS.cafe);
 
   await estoca.recordMovement({
