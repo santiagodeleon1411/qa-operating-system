@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite';
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vitest/config';
 
 // In dev, the frontend and the backend are two separate processes (ADR-0007). Vite serves
 // the frontend and proxies every /api/* request to the backend process, so the browser
@@ -13,5 +14,11 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
+  },
+  // Vitest runs the fast unit and contract tests only. The end-to-end tests live under e2e/
+  // and are run by Playwright, not Vitest — restrict the include so Vitest never tries to
+  // load a *.spec.ts that imports @playwright/test.
+  test: {
+    include: ['src/**/*.test.ts'],
   },
 });
