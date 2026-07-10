@@ -5,6 +5,7 @@ import { getProducts, postMovement, postAdjustment } from './handlers';
 import { productsResponse, movement, errorResponse, adjustmentResult, staleCount } from '../contract';
 
 const at = '2026-07-06T00:00:00.000Z';
+const actor = { id: 'u-ana', username: 'ana', name: 'Ana' }; // an authenticated user (ADR-0008)
 
 describe('GET /products honors the contract', () => {
   let repo: MovementsRepo;
@@ -13,9 +14,9 @@ describe('GET /products honors the contract', () => {
   });
 
   it('returns the catalogue with Stock derived from the ledger, in contract shape', () => {
-    repo.recordMovement({ productId: 'p-cafe', kind: 'entry', quantity: 10, reason: 'compra', at });
+    repo.recordMovement({ productId: 'p-cafe', kind: 'entry', quantity: 10, reason: 'compra', actorId: actor.id, at });
 
-    const res = getProducts(repo);
+    const res = getProducts(repo, actor);
 
     expect(res.status).toBe(200);
     // The response parses against the contract — the shape the frontend was promised.
@@ -27,7 +28,7 @@ describe('GET /products honors the contract', () => {
 
   it('marks a Product with Stock at or below its threshold as in Stockout', () => {
     // No movements: every Product sits at Stock 0, at or below its threshold.
-    const products = productsResponse.parse(getProducts(repo).body);
+    const products = productsResponse.parse(getProducts(repo, actor).body);
     expect(products.every((p) => p.stock === 0 && p.stockout)).toBe(true);
   });
 });
@@ -38,18 +39,20 @@ describe('POST /movements honors the contract on both edges', () => {
     repo = new MovementsRepo(createDb());
   });
 
-  it('records a valid movement and echoes it in contract shape, server-stamping the time', () => {
-    const res = postMovement(repo, { productId: 'p-cafe', kind: 'entry', quantity: 4, reason: 'compra' }, at);
+  it('records a valid movement, stamps the actor, and echoes it in contract shape', () => {
+    const res = postMovement(repo, actor, { productId: 'p-cafe', kind: 'entry', quantity: 4, reason: 'compra' }, at);
 
     expect(res.status).toBe(201);
     const created = movement.parse(res.body); // valid Movement, `at` is a real ISO datetime
     expect(created.at).toBe(at);
+    expect(created).toMatchObject({ actorId: 'u-ana', actorName: 'Ana' }); // attribution
     expect(repo.deriveStock('p-cafe')).toBe(4);
   });
 
   it('ignores any `at` the caller tries to send — the server owns the time', () => {
     const res = postMovement(
       repo,
+      actor,
       { productId: 'p-cafe', kind: 'entry', quantity: 1, reason: 'compra', at: '1999-01-01T00:00:00.000Z' },
       at,
     );
@@ -58,7 +61,7 @@ describe('POST /movements honors the contract on both edges', () => {
   });
 
   it('refuses a malformed request at the boundary with the typed error shape', () => {
-    const res = postMovement(repo, { productId: 'p-cafe', kind: 'entry', quantity: -3, reason: 'compra' }, at);
+    const res = postMovement(repo, actor, { productId: 'p-cafe', kind: 'entry', quantity: -3, reason: 'compra' }, at);
 
     expect(res.status).toBe(422);
     expect(() => errorResponse.parse(res.body)).not.toThrow();
@@ -66,9 +69,9 @@ describe('POST /movements honors the contract on both edges', () => {
   });
 
   it('turns a never-negative refusal into the typed error, not a crash', () => {
-    postMovement(repo, { productId: 'p-cafe', kind: 'entry', quantity: 3, reason: 'compra' }, at);
+    postMovement(repo, actor, { productId: 'p-cafe', kind: 'entry', quantity: 3, reason: 'compra' }, at);
 
-    const res = postMovement(repo, { productId: 'p-cafe', kind: 'exit', quantity: 5, reason: 'venta' }, at);
+    const res = postMovement(repo, actor, { productId: 'p-cafe', kind: 'exit', quantity: 5, reason: 'venta' }, at);
 
     expect(res.status).toBe(422);
     expect(() => errorResponse.parse(res.body)).not.toThrow();
@@ -81,16 +84,16 @@ describe('POST /adjustments reconciles a physical count without ever storing Sto
   beforeEach(() => {
     repo = new MovementsRepo(createDb());
     // Café starts at 42 in the ledger.
-    repo.recordMovement({ productId: 'p-cafe', kind: 'entry', quantity: 42, reason: 'compra', at });
+    repo.recordMovement({ productId: 'p-cafe', kind: 'entry', quantity: 42, reason: 'compra', actorId: actor.id, at });
   });
 
-  const count = (body: Record<string, unknown>) => postAdjustment(repo, body, at);
+  const count = (body: Record<string, unknown>) => postAdjustment(repo, actor, body, at);
 
   it('records a downward adjustment when the count is below the system', () => {
     const res = count({ productId: 'p-cafe', counted: 39, reason: 'rotura', expectedStock: 42 });
     expect(res.status).toBe(201);
     const parsed = adjustmentResult.parse(res.body);
-    expect(parsed).toMatchObject({ adjusted: true, movement: { kind: 'exit', quantity: 3 } });
+    expect(parsed).toMatchObject({ adjusted: true, movement: { kind: 'exit', quantity: 3, actorName: 'Ana' } });
     expect(repo.deriveStock('p-cafe')).toBe(39);
   });
 
@@ -129,7 +132,7 @@ describe('POST /adjustments reconciles a physical count without ever storing Sto
 
   it('surfaces a Stock change during the count and measures the difference from the count', () => {
     // A sale of 1 lands while the Merchant is counting: system goes 42 -> 41.
-    repo.recordMovement({ productId: 'p-cafe', kind: 'exit', quantity: 1, reason: 'venta', at });
+    repo.recordMovement({ productId: 'p-cafe', kind: 'exit', quantity: 1, reason: 'venta', actorId: actor.id, at });
 
     // First submit: the Stock no longer matches what the count began with. Warn, record nothing.
     const warned = count({ productId: 'p-cafe', counted: 39, reason: 'rotura', expectedStock: 42 });
@@ -148,7 +151,7 @@ describe('POST /adjustments reconciles a physical count without ever storing Sto
   it('lets the never-negative trigger refuse an adjustment that would drive Stock below zero', () => {
     // Sales drop the real Stock to 2 during the count; the Merchant reconfirms a count of 0
     // taken against the original 42, which would apply an exit of 42 onto a Stock of 2.
-    repo.recordMovement({ productId: 'p-cafe', kind: 'exit', quantity: 40, reason: 'venta', at }); // 42 -> 2
+    repo.recordMovement({ productId: 'p-cafe', kind: 'exit', quantity: 40, reason: 'venta', actorId: actor.id, at }); // 42 -> 2
     const res = count({ productId: 'p-cafe', counted: 0, reason: 'sin stock', expectedStock: 42, confirmed: true });
     expect(res.status).toBe(422);
     expect(repo.deriveStock('p-cafe')).toBe(2); // the schema backstop held
@@ -167,6 +170,6 @@ describe('the contract has teeth — a drifted response is caught at the boundar
       ],
     } as unknown as MovementsRepo;
 
-    expect(() => getProducts(driftedRepo)).toThrow();
+    expect(() => getProducts(driftedRepo, actor)).toThrow();
   });
 });

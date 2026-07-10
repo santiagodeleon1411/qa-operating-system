@@ -18,26 +18,57 @@ export const PRODUCT_IDS = {
   azucar: 'p-azucar',
 } as const;
 
+// The seeded users (src/users.ts) with their dev passwords. The whole app is behind a login
+// now (ADR-0008), so a test authenticates before it can reach the shop.
+export const LOGINS = {
+  ana: { username: 'ana', password: 'estoca-ana', name: 'Ana' },
+  bruno: { username: 'bruno', password: 'estoca-bruno', name: 'Bruno' },
+  caro: { username: 'caro', password: 'estoca-caro', name: 'Caro' },
+} as const;
+
 // A Page Object: the ONE place that knows how Estoca's screen is built. Tests speak in terms
-// of "record a movement" or "the Stock of the café"; only this class knows which selectors and
-// form fields make that happen. When the UI changes, this file changes — not the tests.
+// of "log in", "record a movement" or "the Stock of the café"; only this class knows which
+// selectors and form fields make that happen. When the UI changes, this file changes.
 export class EstocaPage {
   constructor(private readonly page: Page) {}
 
-  /** Open the app without waiting for a particular state (used to observe the loading/error UI). */
+  /** Open the app without waiting for a particular state (used to observe login/error UI). */
   async open(): Promise<void> {
     await this.page.goto('/');
   }
 
-  /** Open the app and wait until it is past the loading state, showing the shelf. */
-  async goto(): Promise<void> {
+  /** Fill and submit the login form, without waiting for the shop (for the failure path). */
+  async attemptLogin(username: string, password: string): Promise<void> {
     await this.open();
+    const form = this.page.locator('#login-form');
+    await form.locator('input[name=username]').fill(username);
+    await form.locator('input[name=password]').fill(password);
+    await form.getByRole('button', { name: 'Entrar' }).click();
+  }
+
+  /** Log in and wait until the shop is shown — what most tests do first. */
+  async login(username: string, password: string): Promise<void> {
+    await this.attemptLogin(username, password);
     await this.page.getByRole('heading', { name: 'Stock actual' }).waitFor();
+  }
+
+  /** The error line on the login form. */
+  get loginError(): Locator {
+    return this.page.locator('#login-error');
+  }
+
+  /** The "Conectado como …" line in the top bar. */
+  get connectedAs(): Locator {
+    return this.page.locator('.topbar');
+  }
+
+  async logout(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Salir' }).click();
   }
 
   /** The table row for a Product, located by its visible name. */
   private row(productName: string): Locator {
-    return this.page.locator('tbody tr', { hasText: productName });
+    return this.page.locator('tbody tr', { hasText: productName }).first();
   }
 
   /** The Stock cell of a Product — used both to read a baseline and to assert on the result. */
@@ -87,6 +118,11 @@ export class EstocaPage {
   /** The "Confirmar mi conteo" button shown only when the Stock changed during the count. */
   get reconfirmButton(): Locator {
     return this.page.getByRole('button', { name: 'Confirmar mi conteo' });
+  }
+
+  /** The most recent row of the movement history — where attribution becomes visible. */
+  firstHistoryRow(): Locator {
+    return this.page.locator('#history tr').first();
   }
 
   /** The unavailable-state alert shown when the backend cannot be reached. */
