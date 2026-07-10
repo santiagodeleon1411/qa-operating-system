@@ -67,7 +67,7 @@ describe('the client records movements and surfaces refusals', () => {
 });
 
 describe('the client maps each adjustment outcome to a typed result', () => {
-  const input = { productId: 'p-cafe', counted: 39, reason: 'rotura', expectedStock: 42 };
+  const input = { productId: 'p-cafe', counted: 39, reason: 'Rotura' as const, expectedStock: 42 };
 
   it('returns "recorded" with the movement on a 201', async () => {
     stubFetch(201, { adjusted: true, movement: aMovement });
@@ -93,7 +93,7 @@ describe('the client maps each adjustment outcome to a typed result', () => {
 
 describe('identity on the client', () => {
   it('login returns the user on success', async () => {
-    stubFetch(200, { id: 'u-ana', username: 'ana', name: 'Ana' });
+    stubFetch(200, { id: 'u-ana', username: 'ana', name: 'Ana', role: 'owner' });
     expect(await login({ username: 'ana', password: 'estoca-ana' })).toMatchObject({ name: 'Ana' });
   });
 

@@ -11,6 +11,7 @@
 // lies" cannot be reopened across the wire.
 
 import { z } from 'zod';
+import { ROLES, ADJUSTMENT_REASONS } from '../authz';
 
 export const movementKind = z.enum(['entry', 'exit']);
 
@@ -66,6 +67,9 @@ export const sessionUser = z.object({
   id: z.string().min(1),
   username: z.string().min(1),
   name: z.string().min(1),
+  // The actor's role travels to the screen so the UI can reflect the policy (hide controls a
+  // role may not use). It is not a secret; authorization is enforced server-side regardless.
+  role: z.enum(ROLES),
 });
 export type SessionUser = z.infer<typeof sessionUser>;
 
@@ -105,7 +109,10 @@ export type ErrorResponse = z.infer<typeof errorResponse>;
 export const adjustmentInput = z.object({
   productId: z.string().min(1, 'Falta indicar el Product.'),
   counted: z.number(),
-  reason: z.string().refine((s) => s.trim().length > 0, 'Un movimiento debe registrar un motivo.'),
+  // Closed set, not free text: the reason is the unit of authorization (a theft-or-loss
+  // classification is owner-only), so the server owns the vocabulary rather than trusting the
+  // caller's string. See src/authz.ts and docs/specs/authorization-role-model.md.
+  reason: z.enum(ADJUSTMENT_REASONS, { error: 'Motivo de ajuste inválido.' }),
   expectedStock: z.number().int(),
   confirmed: z.boolean().optional(),
 });

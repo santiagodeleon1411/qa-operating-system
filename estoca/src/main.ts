@@ -9,8 +9,10 @@ import {
   recordAdjustment,
   MovementRefused,
   NotAuthenticated,
+  Forbidden,
 } from './api/client';
 import type { ProductView, Movement, SessionUser } from './contract';
+import type { AdjustmentReason } from './authz';
 
 // The whole app sits behind a session (ADR-0008). On load we ask the backend who we are:
 // a user renders the shop; no session renders the login; a network failure renders the
@@ -106,9 +108,55 @@ async function onLogout(): Promise<void> {
 
 function renderApp(products: ProductView[], movements: Movement[]): void {
   current = products; // the snapshot a physical count will be measured against
+
+  // The UI reflects the actor's role (docs/specs/authorization-role-model.md). This is a
+  // courtesy — hiding a control the role may not use — NOT the guarantee: authorization is
+  // enforced server-side at the write edge regardless of what the screen shows.
+  const role = user?.role ?? 'employee';
+  const canEntry = role === 'owner' || role === 'employee'; // the runner records exits only
+  const canAdjust = role === 'owner' || role === 'employee'; // the runner records no adjustments
+  const canClassifyTheft = role === 'owner'; // theft-or-loss is the owner's alone
+  const roleLabel = { owner: 'Dueña', employee: 'Empleado', runner: 'Cadete' }[role];
+
+  const productOptions = products
+    .map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`)
+    .join('');
+
+  // The adjustment panel, shown only to roles that may adjust. The theft-or-loss reason is
+  // offered only to the owner; everyone who can adjust gets the neutral "Faltante sin clasificar".
+  const adjustPanel = canAdjust
+    ? `
+    <section class="panel">
+      <h2>Ajustar por conteo físico</h2>
+      <form id="adjust-form">
+        <label>Product
+          <select name="productId">${productOptions}</select>
+        </label>
+        <label>Contaste
+          <input name="counted" type="number" min="0" step="1" value="0" />
+        </label>
+        <label>Motivo de la diferencia
+          <select name="reason">
+            <option value="" disabled selected>Elegí un motivo…</option>
+            <option value="Rotura">Rotura</option>
+            <option value="Error de carga">Error de carga</option>
+            <option value="Faltante sin clasificar">Faltante sin clasificar</option>
+            ${canClassifyTheft ? '<option value="Robo o pérdida">Robo o pérdida</option>' : ''}
+          </select>
+        </label>
+        <button type="submit">Registrar ajuste</button>
+      </form>
+      <p class="note">
+        Ingresá el número real que contaste. El sistema registra la diferencia como un
+        movimiento — nunca reescribe el Stock a mano.
+      </p>
+      <p id="adjust-msg" class="error" role="status"></p>
+    </section>`
+    : '';
+
   app.innerHTML = `${header()}
     <section class="panel topbar">
-      <span class="note">Conectado como <strong>${esc(user?.name ?? '')}</strong></span>
+      <span class="note">Conectado como <strong>${esc(user?.name ?? '')}</strong> · ${esc(roleLabel)}</span>
       <button id="logout" type="button">Salir</button>
     </section>
 
@@ -147,7 +195,7 @@ function renderApp(products: ProductView[], movements: Movement[]): void {
         </label>
         <label>Tipo
           <select name="kind">
-            <option value="entry">Entrada (+)</option>
+            ${canEntry ? '<option value="entry">Entrada (+)</option>' : ''}
             <option value="exit">Salida (−)</option>
           </select>
         </label>
@@ -162,33 +210,7 @@ function renderApp(products: ProductView[], movements: Movement[]): void {
       <p id="error" class="error" role="alert"></p>
     </section>
 
-    <section class="panel">
-      <h2>Ajustar por conteo físico</h2>
-      <form id="adjust-form">
-        <label>Product
-          <select name="productId">
-            ${products.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}
-          </select>
-        </label>
-        <label>Contaste
-          <input name="counted" type="number" min="0" step="1" value="0" />
-        </label>
-        <label>Motivo de la diferencia
-          <select name="reason">
-            <option value="" disabled selected>Elegí un motivo…</option>
-            <option value="Rotura">Rotura</option>
-            <option value="Robo o pérdida">Robo o pérdida</option>
-            <option value="Error de carga">Error de carga</option>
-          </select>
-        </label>
-        <button type="submit">Registrar ajuste</button>
-      </form>
-      <p class="note">
-        Ingresá el número real que contaste. El sistema registra la diferencia como un
-        movimiento — nunca reescribe el Stock a mano.
-      </p>
-      <p id="adjust-msg" class="error" role="status"></p>
-    </section>
+    ${adjustPanel}
 
     <section class="panel">
       <h2>Historial de movimientos</h2>
@@ -215,7 +237,8 @@ function renderApp(products: ProductView[], movements: Movement[]): void {
 
   document.querySelector<HTMLButtonElement>('#logout')!.addEventListener('click', onLogout);
   document.querySelector<HTMLFormElement>('#movement-form')!.addEventListener('submit', onSubmit);
-  document.querySelector<HTMLFormElement>('#adjust-form')!.addEventListener('submit', onAdjust);
+  // The adjust form is absent for roles that may not adjust (the runner); wire it only if shown.
+  document.querySelector<HTMLFormElement>('#adjust-form')?.addEventListener('submit', onAdjust);
 }
 
 async function onSubmit(e: SubmitEvent): Promise<void> {
@@ -235,9 +258,10 @@ async function onSubmit(e: SubmitEvent): Promise<void> {
     await loadApp(); // re-read the truth from the backend
   } catch (err) {
     if (err instanceof NotAuthenticated) return renderLogin('Tu sesión expiró. Iniciá sesión de nuevo.');
-    // A refused movement carries the backend's reason; anything else is a transport failure.
+    // A refused movement (domain/invariant) or a forbidden one (role) carries the backend's
+    // reason; anything else is a transport failure.
     errorEl.textContent =
-      err instanceof MovementRefused
+      err instanceof MovementRefused || err instanceof Forbidden
         ? err.message
         : 'No pudimos registrar el movimiento. Revisá tu conexión y probá de nuevo — no se guardó nada, así que podés reintentar sin duplicar.';
   }
@@ -246,7 +270,7 @@ async function onSubmit(e: SubmitEvent): Promise<void> {
 interface CountInput {
   productId: string;
   counted: number;
-  reason: string;
+  reason: AdjustmentReason;
   expectedStock: number;
 }
 
@@ -258,7 +282,9 @@ async function onAdjust(e: SubmitEvent): Promise<void> {
     {
       productId,
       counted: Number(data.get('counted')),
-      reason: String(data.get('reason') ?? ''),
+      // The reason comes from a <select> whose options are exactly the authorized reasons; the
+      // server re-validates it against the same closed set regardless.
+      reason: String(data.get('reason') ?? '') as AdjustmentReason,
       // Measured against the Stock this Product showed when the screen loaded, not now.
       expectedStock: current.find((p) => p.id === productId)?.stock ?? 0,
     },
@@ -287,7 +313,7 @@ async function submitAdjustment(input: CountInput, confirmed: boolean): Promise<
   } catch (err) {
     if (err instanceof NotAuthenticated) return renderLogin('Tu sesión expiró. Iniciá sesión de nuevo.');
     msg.textContent =
-      err instanceof MovementRefused
+      err instanceof MovementRefused || err instanceof Forbidden
         ? err.message
         : 'No pudimos registrar el ajuste. Revisá tu conexión y probá de nuevo.';
   }

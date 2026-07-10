@@ -43,7 +43,7 @@ describe('logout and me', () => {
   });
 
   it('me returns the user when authenticated, 401 when not', () => {
-    const actor = { id: 'u-ana', username: 'ana', name: 'Ana' };
+    const actor = { id: 'u-ana', username: 'ana', name: 'Ana', role: 'owner' as const };
     expect(me(actor).status).toBe(200);
     expect(me(null).status).toBe(401);
   });
@@ -71,8 +71,8 @@ describe('the session guard — no write, and no read, reaches the ledger withou
   });
 
   it('attributes a movement to whoever is authenticated — the actor is not the caller’s to claim', () => {
-    const ana = { id: 'u-ana', username: 'ana', name: 'Ana' };
-    const bruno = { id: 'u-bruno', username: 'bruno', name: 'Bruno' };
+    const ana = { id: 'u-ana', username: 'ana', name: 'Ana', role: 'owner' as const };
+    const bruno = { id: 'u-bruno', username: 'bruno', name: 'Bruno', role: 'employee' as const };
     postMovement(repo, ana, { productId: 'p-cafe', kind: 'entry', quantity: 5, reason: 'compra' }, at);
     postMovement(repo, bruno, { productId: 'p-cafe', kind: 'exit', quantity: 2, reason: 'venta' }, at);
 

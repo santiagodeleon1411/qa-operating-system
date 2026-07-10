@@ -1,11 +1,14 @@
 import type Database from 'better-sqlite3';
 import { verifyPassword, newSessionToken } from '../auth';
+import type { Role } from '../authz';
 
 /** A user as it is safe to expose: never the password hash. See docs/adr/0008. */
 export interface SessionUser {
   id: string;
   username: string;
   name: string;
+  /** The role that governs what this user may do — carried on the actor for the write-edge guard. */
+  role: Role;
 }
 
 /**
@@ -30,10 +33,10 @@ export class AuthRepo {
    */
   authenticate(username: string, password: string): SessionUser | null {
     const row = this.db
-      .prepare('SELECT id, username, name, password_hash AS passwordHash FROM users WHERE username = ?')
+      .prepare('SELECT id, username, name, role, password_hash AS passwordHash FROM users WHERE username = ?')
       .get(username) as (SessionUser & { passwordHash: string }) | undefined;
     if (!row || !verifyPassword(password, row.passwordHash)) return null;
-    return { id: row.id, username: row.username, name: row.name };
+    return { id: row.id, username: row.username, name: row.name, role: row.role };
   }
 
   /** Open a session for a user, expiring at the given ISO time. Returns the opaque token. */
@@ -53,14 +56,14 @@ export class AuthRepo {
   userForToken(token: string, now: string): SessionUser | null {
     const row = this.db
       .prepare(
-        `SELECT u.id, u.username, u.name, s.expires_at AS expiresAt
+        `SELECT u.id, u.username, u.name, u.role, s.expires_at AS expiresAt
            FROM sessions s
            JOIN users u ON u.id = s.user_id
           WHERE s.token = ?`,
       )
       .get(token) as (SessionUser & { expiresAt: string }) | undefined;
     if (!row || row.expiresAt <= now) return null;
-    return { id: row.id, username: row.username, name: row.name };
+    return { id: row.id, username: row.username, name: row.name, role: row.role };
   }
 
   /** Close a session (logout). Idempotent: deleting an unknown token is a no-op. */
