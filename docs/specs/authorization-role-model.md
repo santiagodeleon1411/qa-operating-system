@@ -1,15 +1,22 @@
 # Proposal — Authorization role model
 
 ## Status
-**Proposal — pending owner sign-off.** Drafted 2026-07-10 by engineering as the input to
-identity slice 2 (authorization) decided in
-[ADR-0008](../adr/0008-identity-authentication-attribution-authorization.md). Authorization is
-a **business policy, not an engineering decision**: this document proposes a default and makes
-the risk of each grant explicit, but the permission matrix is not final until the shop owner
-approves or amends it. No authorization code is written before that sign-off.
+**Approved by the owner — 2026-07-10, refined during sign-off.** Drafted by engineering as the
+input to identity slice 2 (authorization) decided in
+[ADR-0008](../adr/0008-identity-authentication-attribution-authorization.md), then amended in a
+sign-off round with the owner and approved. Ready for development.
 
 Builds on identity slice 1 (authentication and attribution), which established that every
 write is performed by an authenticated actor and stamped, immutably, into the ledger.
+
+### Sign-off outcome
+The initial proposal restricted **all** shortfall write-offs to the owner. The owner is off-site
+much of the week, which surfaced a conflict with the project's core invariant: if only the owner
+can record a shortfall, the Stock *lies* until the owner returns. Resolving it without weakening
+the control produced the design below — a **maker-checker split**: recording a shortfall and
+*classifying it as theft* became two separate acts, and only the second is restricted. An
+employee can correct the Stock in the moment; only the owner can label a disappearance a loss.
+The unit of authorization is therefore the **adjustment reason**, not the adjustment action.
 
 ## Why authorization, and why now
 Slice 1 answered *who moved the Stock*. It did not answer *who is allowed to*. Today every
@@ -49,8 +56,13 @@ The operations the system exposes today, with the sensitivity that drives their 
 | 1 | View Stock and history (read) | Low |
 | 2 | Record movement — **entry** (restock / purchase) | Medium |
 | 3 | Record movement — **exit** (sale / delivery) | Medium |
-| 4 | Record adjustment — reason *Breakage* / *Data-entry error* | High |
+| 4 | Record adjustment — reason *Breakage* / *Data-entry error* / *Unexplained shortfall* | High |
 | 5 | Record adjustment — reason *Theft or loss* | Highest |
+
+Adjustments 4 and 5 are the same action distinguished only by their **reason**, which is why the
+reason — not the bare action — is the unit of authorization. *Unexplained shortfall* is a new,
+deliberately neutral reason introduced by the sign-off (see below): it records that a count does
+not match without asserting a cause.
 
 ## Proposed permission matrix
 
@@ -59,7 +71,7 @@ The operations the system exposes today, with the sensitivity that drives their 
 | View Stock / history | ✅ | ✅ | ✅ |
 | Movement — entry | ✅ | ✅ | ❌ |
 | Movement — exit | ✅ | ✅ | ✅ |
-| Adjustment — Breakage / Data-entry error | ✅ | ✅ | ❌ |
+| Adjustment — Breakage / Data-entry error / **Unexplained shortfall** | ✅ | ✅ | ❌ |
 | **Adjustment — Theft or loss** | ✅ | ❌ | ❌ |
 
 ## Rationale for the sensitive grants
@@ -75,6 +87,30 @@ be the one who justifies its disappearance.** Restricting theft-or-loss adjustme
 owner keeps the write-off in the hands of the person accountable for the inventory, not the
 people who move it daily.
 
+### Recording a shortfall is separated from classifying it as theft (maker-checker)
+The owner being off-site forced the question the initial proposal missed: how does the Stock
+stay honest when the only person allowed to write off a shortfall is away for days? The answer
+is to split the act. Recording *that* a count fell short and classifying that shortfall *as
+theft* are different decisions with different risk:
+
+- Any employee may record an adjustment with the neutral reason **Unexplained shortfall**. The
+  Stock is corrected in the moment, so it never lies — the invariant holds.
+- Only the owner may record an adjustment reasoned **Theft or loss** — the classification that
+  writes the shortfall off as an accounted-for loss.
+
+Why prevent this and not merely detect it, given that attribution already names who recorded
+every movement: **a theft written off as a "loss" disguises itself as routine.** It leaves a
+tidy, plausible, reconciled record that no one has reason to look at twice — attribution names
+the recorder but does not raise a hand. Forcing an employee's shortfall into *Unexplained*
+turns a self-justifying act into an open question that lands on the owner's desk unresolved. The
+control is worth its cost here precisely because the risk it addresses hides itself.
+
+**What this does not do (stated so it is not over-claimed).** This closes the hole of writing a
+shortfall off as a loss. It does not stop a shortfall being disguised as a legitimate *exit* (a
+sale that never happened) — an employee holds the exit permission, and attribution, not
+authorization, is the record there. Catching that requires reconciliation (recorded sales
+against takings), which is a detection concern and out of scope for this model.
+
 ### The runner may record exits, and attribution is what makes that safe
 Granting the runner exits lets them decrease Stock (recording deliveries out). In isolation
 that reads as risk. It is safe here for two reasons, and both are why slice 1 had to come
@@ -89,17 +125,22 @@ first:
 The runner is denied entries (restocking) and the non-theft adjustments as least-privilege
 defaults: nothing in the delivery role requires them today.
 
-## Decisions requiring the owner's sign-off
-Engineering recommends the matrix above. The two cells below are business policy, not
-engineering; the owner confirms or amends them:
+## Decisions settled at sign-off
+These were the business-policy calls; the owner made them:
 
-1. **Theft-or-loss adjustment restricted to the owner only.** Recommended. The counter-case to
-   weigh: if the owner is frequently off-site, a shortfall may need to be recorded in the
-   moment by an employee. If so, the grant widens to the employee — but never to the runner.
-2. **The runner may record exits (not read-only).** Recommended per the pilot's request, made
-   safe by attribution as described above.
+1. **Theft-or-loss classification restricted to the owner only** — confirmed. The off-site
+   conflict it raised was resolved by the maker-checker split above (employees record
+   *Unexplained shortfall*; only the owner classifies *Theft or loss*), not by widening the
+   theft grant.
+2. **The runner may record exits (not read-only)** — confirmed, made safe by attribution.
 
 ## Out of scope (deferred, with triggers)
+- **A shortfall review queue** — the maker-checker split above lets an employee record an
+  *Unexplained shortfall* and lets the owner classify their own counts as *Theft or loss*, but
+  it does not let the owner later *reclassify* an employee's unexplained shortfall in the
+  system. That reclassification workflow (pending state, review surface, an audit trail of the
+  reclassification) is the fuller version of this control. Deferred until the shop asks to act
+  on shortfalls after the fact; for the pilot the owner reviews them in the history by eye.
 - **Assigning and changing roles in the product** — roles are seeded in code for the pilot. A
   self-service admin surface waits until the shop manages its own staff.
 - **Role hierarchies and custom roles** — three fixed roles are enough for the pilot. Revisit
