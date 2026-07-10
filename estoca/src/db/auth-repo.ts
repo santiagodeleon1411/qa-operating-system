@@ -18,8 +18,15 @@ export class AuthRepo {
 
   /**
    * Verify a username/password pair. Returns the safe SessionUser on success, or null on any
-   * failure — unknown user or wrong password alike. The two are deliberately indistinguishable
-   * to the caller, so an attacker cannot probe which usernames exist.
+   * failure — unknown user or wrong password alike, with the same error body, so the response
+   * itself does not reveal which usernames exist.
+   *
+   * Timing caveat: an unknown user returns before any hashing runs, while a known user with a
+   * wrong password pays scrypt's deliberate cost, so response latency still leaks existence to
+   * an attacker who measures it. Accepted for the pilot (three seeded users, low value to the
+   * attack). The fix, deferred until login is exposed beyond the pilot: always run a hash —
+   * comparing against a fixed dummy hash when the user is unknown — so both paths take the
+   * same time.
    */
   authenticate(username: string, password: string): SessionUser | null {
     const row = this.db
