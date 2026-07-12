@@ -37,13 +37,28 @@ A reviewer confirms, before the work is scheduled:
    written so each can become a test. A criterion that cannot be turned into a test is not
    yet a criterion — it is an opinion, and it is sharpened until it is testable.
 
-4. **The edge cases and failure paths are named.**
+4. **Acceptance criteria are written at the altitude of what they accept.**
+   When work is decomposed into a parent and children, the criteria live at three distinct
+   altitudes and are not duplicated across them:
+   - the **parent** carries the **behavioral, black-box** criteria — what the Merchant
+     observes end to end, independent of how the work is split between layers;
+   - each **child** carries the **contract of its layer** — backend: the API, authorization,
+     and data rules; frontend: what renders for a given state and role;
+   - **design** criteria live with the frontend as **exact numeric values** (padding, size,
+     color), verified by comparison, not by visual judgment.
+
+   Each child criterion exists because it serves a parent behavior: one that does not trace
+   upward is gold-plating, and a parent behavior not covered by the children plus their
+   end-to-end check is a gap. The hierarchy is used at the altitude the work actually has —
+   a trivial change needs only a parent behavior, not three levels.
+
+5. **The edge cases and failure paths are named.**
    Not only the happy path: the empty, zero, boundary, duplicate, and stale cases, and what
    the user sees when something goes wrong. An unnamed edge does not disappear; it is
    discovered mid-build as a bug or an argument. Naming it up front is cheaper than finding
    it late.
 
-5. **Its unknowns and dependencies are surfaced.**
+6. **Its unknowns and dependencies are surfaced.**
    Anything the work needs that does not yet exist — another feature, a decision not yet
    made, data not yet captured — is called out now, not discovered halfway through. A hidden
    dependency is a deadline that has already slipped without anyone knowing.
