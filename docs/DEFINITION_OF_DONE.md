@@ -55,12 +55,13 @@ certifies:
 A change reaches `main` only with **one human approval**. This is the human half of
 "done" and is not optional.
 
-- **Enforcement:** the GitHub ruleset requires one approval on `main`. It is **activated
-  when a second engineer's account joins the repository.** GitHub does not permit
-  self-approval, so requiring an approval on a single-contributor repository would force a
-  bypass on every merge and remove the meaning of the exception below. Until a second
-  reviewer exists, this document is the operative standard; enforcement is applied once it
-  can function as intended.
+- **Enforcement:** the GitHub ruleset requires one approval on `main` and both CI checks
+  to pass. It was **activated on 2026-07-12, ahead of the second engineer's start, so the
+  repository is ready the day they can review.** GitHub does not permit self-approval, so
+  during the short single-contributor window before their account joins, a routine change
+  waits for that first reviewer rather than merging alone; the break-glass exception below
+  covers a genuine emergency in the interim. This document was the operative standard
+  before enforcement and remains the standard that enforcement points to.
 
 ## Break-glass exception
 
