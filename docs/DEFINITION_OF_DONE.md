@@ -3,7 +3,8 @@
 A change is **done** when both halves below hold. This document is expected to evolve as
 the product and team change.
 
-Its single purpose is to protect the invariant: **the Stock never lies.**
+Its single purpose is to protect the invariant: **the Stock never lies — and we know who
+moved it, and whether they were allowed to.**
 
 ---
 
@@ -39,6 +40,13 @@ certifies:
    If the reviewer cannot explain the change in their own words, it is not done and is
    clarified or simplified before merging. Code that cannot be explained later is a
    maintenance liability regardless of test status.
+
+4. **Attribution and authorization are preserved.**
+   Every write path still records *who* acted and enforces *whether they were allowed* on
+   the server, not only in the UI. A new or changed write endpoint keeps its 401/403
+   guards, and adjustment reasons remain a closed server-side enum. The UI may hide a
+   control it cannot use, but the server must still refuse the request behind it — the
+   guarantee is enforced where it cannot be bypassed, not merely where it is displayed.
 
 ---
 
