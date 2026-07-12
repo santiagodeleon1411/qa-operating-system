@@ -55,13 +55,13 @@ certifies:
 A change reaches `main` only with **one human approval**. This is the human half of
 "done" and is not optional.
 
-- **Enforcement:** the GitHub ruleset requires one approval on `main` and both CI checks
-  to pass. It was **activated on 2026-07-12, ahead of the second engineer's start, so the
-  repository is ready the day they can review.** GitHub does not permit self-approval, so
-  during the short single-contributor window before their account joins, a routine change
-  waits for that first reviewer rather than merging alone; the break-glass exception below
-  covers a genuine emergency in the interim. This document was the operative standard
-  before enforcement and remains the standard that enforcement points to.
+- **Enforcement.** A live GitHub ruleset can require one approval and both CI checks before
+  a merge — but that rule is only meaningful once a **second reviewer's account exists**.
+  GitHub forbids self-approval, so enabling it on a single-contributor repository would force
+  an admin bypass on **every** merge, which is theater, not a control: a gate overridden every
+  time reads as weaker than none. While there is a single contributor, **this document is the
+  operative standard**, and the live ruleset is enabled the day a real second reviewer joins.
+  The standard does not depend on the switch; the switch depends on there being a second mind.
 
 ## Break-glass exception
 
