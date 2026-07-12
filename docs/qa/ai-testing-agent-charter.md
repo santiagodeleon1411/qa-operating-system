@@ -64,7 +64,12 @@ screen "looks right":
   spec (e.g. `padding-left: 16px`, `font-size: 14px`, `color: #1A1A1A`).
 - The **actual** value comes from the rendered UI's **computed style** (read via the browser /
   Playwright).
-- The case passes only on exact match, within a tolerance stated in the criterion.
+- **Tolerance defaults to zero.** A directly specified value (padding, font size, color, border
+  radius) resolves to an exact computed value and is asserted for exact equality. A non-zero
+  tolerance is admitted **only** where the value is layout-derived — produced by flex/grid
+  distribution, percentage math, or sub-pixel rounding — and it is declared and justified in the
+  criterion. This keeps design verification mechanical by default and prevents false failures: a
+  flaky design test erodes trust exactly as a flaky functional test does.
 
 The agent never asserts a visual judgment ("looks aligned"). Screenshot/visual-regression
 diffing is a separate, complementary tool that answers "did it drift from last known-good?",
@@ -100,11 +105,19 @@ mechanism, and does not attempt to automate it.
 2. **Visual and happy-path review** of the running feature.
 3. **The final OK.**
 
-## Open questions to resolve before this is in force
+## Resolved decisions
 
-- Where do test cases live — as a checklist in the issue, a child issue, or a committed file
-  next to the code? (Traceability vs. ceremony.)
-- What tolerance is acceptable for a "pixel perfect" numeric match, and who sets it — the PM in
-  the criterion, or a default here?
-- Does the agent get read access to a running test environment in v1, or only to the codebase
-  and the design values? (Execution vs. planning scope.)
+- **Where test cases live.** A feature's cases are **linked to their task** (the issue) — that is
+  their home while the feature is built and accepted. A case that earns ongoing value is then
+  **promoted to the regression suite**, a deliberate curation decision: every regression test
+  carries perpetual maintenance cost, so the suite is a curated asset, not a dumping ground. For
+  Estoca the regression suite **is the automated test code in the repo** (`src/**/*.test.ts`,
+  `e2e/`), run by the gate on every merge; durable manual/exploratory cases live as Markdown under
+  `docs/qa/`. A dedicated test-management tool (e.g. Qase) is a later maturity event — triggered by
+  a manual QA function with several testers, or a client/audit requiring execution-run reporting —
+  not adopted now.
+- **Pixel-perfect tolerance.** Zero by default; a declared, justified tolerance is admitted only
+  for layout-derived values (see rule 2).
+- **v1 scope is planning, not autonomous execution.** The agent reads the codebase and the design
+  values and **drafts** cases; it is not given autonomous execution-with-verdict against a running
+  environment. Execution scope is a v2 decision, taken once the harness is trusted.
