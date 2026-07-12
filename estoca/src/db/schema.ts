@@ -19,6 +19,9 @@ CREATE TABLE users (
   id            TEXT PRIMARY KEY,
   username      TEXT NOT NULL UNIQUE,
   name          TEXT NOT NULL,
+  -- The role governs what the user may do (ADR-0008, authorization). Constrained in the schema,
+  -- like movement.kind, so an unknown role cannot be represented.
+  role          TEXT NOT NULL CHECK (role IN ('owner','employee','runner')),
   password_hash TEXT NOT NULL
 );
 
@@ -73,8 +76,10 @@ export function createDb(): Database.Database {
   for (const p of PRODUCTS) insertProduct.run(p.id, p.name, p.threshold);
 
   // Seed users, hashing each dev password before it is stored — never in plaintext.
-  const insertUser = db.prepare('INSERT INTO users (id, username, name, password_hash) VALUES (?, ?, ?, ?)');
-  for (const u of USERS) insertUser.run(u.id, u.username, u.name, hashPassword(u.password));
+  const insertUser = db.prepare(
+    'INSERT INTO users (id, username, name, role, password_hash) VALUES (?, ?, ?, ?, ?)',
+  );
+  for (const u of USERS) insertUser.run(u.id, u.username, u.name, u.role, hashPassword(u.password));
 
   return db;
 }

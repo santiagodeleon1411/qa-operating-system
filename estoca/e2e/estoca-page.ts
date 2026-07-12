@@ -21,9 +21,9 @@ export const PRODUCT_IDS = {
 // The seeded users (src/users.ts) with their dev passwords. The whole app is behind a login
 // now (ADR-0008), so a test authenticates before it can reach the shop.
 export const LOGINS = {
-  ana: { username: 'ana', password: 'estoca-ana', name: 'Ana' },
-  bruno: { username: 'bruno', password: 'estoca-bruno', name: 'Bruno' },
-  caro: { username: 'caro', password: 'estoca-caro', name: 'Caro' },
+  ana: { username: 'ana', password: 'estoca-ana', name: 'Ana', role: 'owner' },
+  bruno: { username: 'bruno', password: 'estoca-bruno', name: 'Bruno', role: 'employee' },
+  caro: { username: 'caro', password: 'estoca-caro', name: 'Caro', role: 'runner' },
 } as const;
 
 // A Page Object: the ONE place that knows how Estoca's screen is built. Tests speak in terms

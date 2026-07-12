@@ -13,9 +13,9 @@ describe('authentication', () => {
     auth = new AuthRepo(createDb());
   });
 
-  it('accepts the right credentials and returns the user without the hash', () => {
+  it('accepts the right credentials and returns the user (with role) without the hash', () => {
     const user = auth.authenticate('ana', 'estoca-ana');
-    expect(user).toMatchObject({ id: 'u-ana', username: 'ana', name: 'Ana' });
+    expect(user).toMatchObject({ id: 'u-ana', username: 'ana', name: 'Ana', role: 'owner' });
     expect(user).not.toHaveProperty('passwordHash');
   });
 

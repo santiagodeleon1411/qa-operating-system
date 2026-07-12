@@ -13,6 +13,7 @@
 
 import type { MovementsRepo } from '../db/movements-repo';
 import type { AuthRepo, SessionUser } from '../db/auth-repo';
+import { canRecordMovement, canRecordAdjustment } from '../authz';
 import { planAdjustment } from '../domain';
 import {
   movementInput,
@@ -42,6 +43,14 @@ const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const UNAUTHENTICATED: HandlerResult<ErrorResponse> = {
   status: 401,
   body: { error: 'Tenés que iniciar sesión para continuar.' },
+};
+
+// 403 is a different refusal from 401: the actor IS authenticated, but their role does not permit
+// this action (ADR-0008, authorization). 401 says "log in"; 403 says "you may not". The guard is
+// here, in the tested layer, not in the transport — and it stamps nothing on the ledger.
+const FORBIDDEN: HandlerResult<ErrorResponse> = {
+  status: 403,
+  body: { error: 'Tu rol no tiene permiso para esta acción.' },
 };
 
 /** The first human-readable reason a payload failed the contract. */
@@ -119,6 +128,7 @@ export function postMovement(
   if (!actor) return UNAUTHENTICATED;
   const parsed = movementInput.safeParse(rawBody);
   if (!parsed.success) return { status: 422, body: { error: firstIssue(parsed.error) } };
+  if (!canRecordMovement(actor.role, parsed.data.kind)) return FORBIDDEN;
 
   try {
     const created = repo.recordMovement({ ...parsed.data, at: now, actorId: actor.id });
@@ -143,6 +153,9 @@ export function postAdjustment(
   const parsed = adjustmentInput.safeParse(rawBody);
   if (!parsed.success) return { status: 422, body: { error: firstIssue(parsed.error) } };
   const { productId, counted, reason, expectedStock, confirmed } = parsed.data;
+  // Authorization precedes the stale check: a forbidden actor is refused before it can even
+  // learn the current Stock from a 409.
+  if (!canRecordAdjustment(actor.role, reason)) return FORBIDDEN;
 
   const currentStock = repo.deriveStock(productId);
   if (!confirmed && currentStock !== expectedStock) {

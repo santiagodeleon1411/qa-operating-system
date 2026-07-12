@@ -38,6 +38,9 @@ export class MovementRefused extends Error {}
 /** Raised when a request needs a session and there is none (HTTP 401). */
 export class NotAuthenticated extends Error {}
 
+/** Raised when the actor is authenticated but their role does not permit the action (HTTP 403). */
+export class Forbidden extends Error {}
+
 // --- Identity -------------------------------------------------------------------------------
 
 /** `POST /login` — returns the user on success; throws NotAuthenticated on bad credentials. */
@@ -87,6 +90,7 @@ export async function recordMovement(input: MovementInput): Promise<Movement> {
   const json = await res.json();
   if (res.status === 201) return movementSchema.parse(json);
   if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
+  if (res.status === 403) throw new Forbidden(errorResponse.parse(json).error);
   throw new MovementRefused(errorResponse.parse(json).error);
 }
 
@@ -109,5 +113,6 @@ export async function recordAdjustment(input: AdjustmentInput): Promise<Adjustme
     return result.adjusted ? { kind: 'recorded', movement: result.movement } : { kind: 'unchanged' };
   }
   if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
+  if (res.status === 403) throw new Forbidden(errorResponse.parse(json).error);
   throw new MovementRefused(errorResponse.parse(json).error);
 }
