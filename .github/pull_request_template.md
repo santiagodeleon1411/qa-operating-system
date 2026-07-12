@@ -19,6 +19,11 @@
       was extended with the change.
 - [ ] **I understand it** — I can restate what this change does and why in my own words.
       If not, it is clarified or simplified before merge.
+- [ ] **Attribution & authorization preserved** — every write path still records *who*
+      acted and enforces *whether they were allowed* on the server, not only in the UI.
+      New or changed write endpoints keep their 401/403 guards; adjustment reasons stay a
+      closed server-side enum. The UI may hide a control, but the server must still refuse
+      the request behind it.
 
 <!-- The automated half — CI green (safety net + build) — is verified by the machine and
      is not re-checked by hand. -->

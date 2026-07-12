@@ -3,7 +3,8 @@
 A change is **done** when both halves below hold. This document is expected to evolve as
 the product and team change.
 
-Its single purpose is to protect the invariant: **the Stock never lies.**
+Its single purpose is to protect the invariant: **the Stock never lies — and we know who
+moved it, and whether they were allowed to.**
 
 ---
 
@@ -40,6 +41,13 @@ certifies:
    clarified or simplified before merging. Code that cannot be explained later is a
    maintenance liability regardless of test status.
 
+4. **Attribution and authorization are preserved.**
+   Every write path still records *who* acted and enforces *whether they were allowed* on
+   the server, not only in the UI. A new or changed write endpoint keeps its 401/403
+   guards, and adjustment reasons remain a closed server-side enum. The UI may hide a
+   control it cannot use, but the server must still refuse the request behind it — the
+   guarantee is enforced where it cannot be bypassed, not merely where it is displayed.
+
 ---
 
 ## Review is mandatory
@@ -47,12 +55,13 @@ certifies:
 A change reaches `main` only with **one human approval**. This is the human half of
 "done" and is not optional.
 
-- **Enforcement:** the GitHub ruleset requires one approval on `main`. It is **activated
-  when a second engineer's account joins the repository.** GitHub does not permit
-  self-approval, so requiring an approval on a single-contributor repository would force a
-  bypass on every merge and remove the meaning of the exception below. Until a second
-  reviewer exists, this document is the operative standard; enforcement is applied once it
-  can function as intended.
+- **Enforcement.** A live GitHub ruleset can require one approval and both CI checks before
+  a merge — but that rule is only meaningful once a **second reviewer's account exists**.
+  GitHub forbids self-approval, so enabling it on a single-contributor repository would force
+  an admin bypass on **every** merge, which is theater, not a control: a gate overridden every
+  time reads as weaker than none. While there is a single contributor, **this document is the
+  operative standard**, and the live ruleset is enabled the day a real second reviewer joins.
+  The standard does not depend on the switch; the switch depends on there being a second mind.
 
 ## Break-glass exception
 
