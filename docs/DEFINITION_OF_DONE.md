@@ -40,6 +40,13 @@ certifies:
    clarified or simplified before merging. Code that cannot be explained later is a
    maintenance liability regardless of test status.
 
+4. **A design-bearing change carries its mockup.**
+   For any change with a visual surface, a rendered mockup (HTML/CSS) and a PNG screenshot
+   are committed under `docs/mockups/<issue#>-<slug>/`, built from the exact design tokens.
+   This is the design source of record for Route B — the values the design test asserts
+   against a computed style — and the visual record of the work. A change with no visual
+   surface is exempt.
+
 ---
 
 ## Review is mandatory
