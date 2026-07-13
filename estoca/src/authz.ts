@@ -51,3 +51,14 @@ export function canRecordAdjustment(role: Role, reason: AdjustmentReason): boole
   if (reason === OWNER_ONLY_ADJUSTMENT_REASON) return role === 'owner';
   return true;
 }
+
+/**
+ * May this role set a Product's low-stock threshold? The threshold is a shop-wide policy
+ * setting — what counts as "low" for each Product — so it belongs to the owner alone. An
+ * employee or runner recording Stock does not get to redraw the line that decides when the
+ * shop is warned. Unlike movement/adjustment authorization, this turns only on the role: there
+ * is no per-value carve-out, so the guard can run before the request body is even parsed.
+ */
+export function canSetThreshold(role: Role): boolean {
+  return role === 'owner';
+}

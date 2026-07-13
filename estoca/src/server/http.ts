@@ -13,12 +13,14 @@
 import http from 'node:http';
 import { createDb } from '../db/schema';
 import { MovementsRepo } from '../db/movements-repo';
+import { ProductsRepo } from '../db/products-repo';
 import { AuthRepo } from '../db/auth-repo';
 import {
   login,
   logout,
   me,
   getProducts,
+  setThreshold,
   getMovements,
   postMovement,
   postAdjustment,
@@ -28,6 +30,7 @@ import {
 
 const db = createDb();
 const repo = new MovementsRepo(db);
+const products = new ProductsRepo(db);
 const auth = new AuthRepo(db);
 
 const COOKIE = 'session';
@@ -92,7 +95,10 @@ const server = http.createServer(async (req, res) => {
       return respond(res, me(actor));
     }
     if (req.method === 'GET' && req.url === '/products') {
-      return respond(res, getProducts(repo, actor));
+      return respond(res, getProducts(products, actor));
+    }
+    if (req.method === 'PATCH' && req.url === '/products') {
+      return respond(res, setThreshold(products, actor, await readBody(req), now));
     }
     if (req.method === 'GET' && req.url === '/movements') {
       return respond(res, getMovements(repo, actor));

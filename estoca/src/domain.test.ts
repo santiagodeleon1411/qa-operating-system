@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   stockOf,
-  isStockout,
+  isBelowThreshold,
+  effectiveThreshold,
+  assertValidThreshold,
+  DEFAULT_THRESHOLD,
   makeMovement,
   wouldGoNegative,
   planAdjustment,
@@ -49,16 +52,39 @@ describe('Stock is derived, never stored — "the Stock never lies"', () => {
   });
 });
 
-describe('Stockout alerting', () => {
+describe('Low-stock alerting', () => {
   const product: Product = { id: 'p1', name: 'Café', threshold: 5 };
 
   it('does not fire above the threshold', () => {
-    expect(isStockout(product, [mov('p1', 'entry', 6)])).toBe(false);
+    expect(isBelowThreshold(product, [mov('p1', 'entry', 6)])).toBe(false);
   });
 
   it('fires at or below the threshold', () => {
-    expect(isStockout(product, [mov('p1', 'entry', 5)])).toBe(true);
-    expect(isStockout(product, [mov('p1', 'entry', 3)])).toBe(true);
+    expect(isBelowThreshold(product, [mov('p1', 'entry', 5)])).toBe(true);
+    expect(isBelowThreshold(product, [mov('p1', 'entry', 3)])).toBe(true);
+  });
+
+  // BE4: a Product with no threshold set falls back to the default — and the default fails
+  // toward the alert (Ana's rule), so an unset Product at Stock 5 warns, at Stock 6 does not.
+  it('falls back to the default threshold when the owner set none', () => {
+    const unset: Product = { id: 'p1', name: 'Nuevo', threshold: null };
+    expect(effectiveThreshold(unset)).toBe(DEFAULT_THRESHOLD);
+    expect(isBelowThreshold(unset, [mov('p1', 'entry', DEFAULT_THRESHOLD)])).toBe(true);
+    expect(isBelowThreshold(unset, [mov('p1', 'entry', DEFAULT_THRESHOLD + 1)])).toBe(false);
+  });
+});
+
+describe('A threshold outside the settable range is refused', () => {
+  it('accepts a whole number within the closed range, including both bounds', () => {
+    expect(assertValidThreshold(0)).toBe(0);
+    expect(assertValidThreshold(10_000)).toBe(10_000);
+    expect(assertValidThreshold(7)).toBe(7);
+  });
+
+  it('rejects a negative, a decimal, and a value over the sanity cap', () => {
+    expect(() => assertValidThreshold(-1)).toThrow(); // below the floor
+    expect(() => assertValidThreshold(2.5)).toThrow(); // not a whole number
+    expect(() => assertValidThreshold(10_001)).toThrow(); // over the cap
   });
 });
 

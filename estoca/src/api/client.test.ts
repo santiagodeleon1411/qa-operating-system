@@ -32,7 +32,7 @@ const aMovement = {
 
 describe('the client validates responses against the contract', () => {
   it('parses a well-formed catalogue into product views', async () => {
-    stubFetch(200, [{ id: 'p-cafe', name: 'Café', threshold: 5, stock: 10, stockout: false }]);
+    stubFetch(200, [{ id: 'p-cafe', name: 'Café', threshold: 5, stock: 10, belowThreshold: false }]);
     const products = await fetchProducts();
     expect(products[0].stock).toBe(10);
   });
@@ -40,7 +40,7 @@ describe('the client validates responses against the contract', () => {
   it('rejects a response that drifts from the contract, instead of mis-reading it', async () => {
     // The backend renamed `stock` to `quantity`. The frontend refuses the payload at the edge
     // rather than silently rendering a shelf with no Stock — drift is loud on both ends (ADR-0007).
-    stubFetch(200, [{ id: 'p-cafe', name: 'Café', threshold: 5, quantity: 10, stockout: false }]);
+    stubFetch(200, [{ id: 'p-cafe', name: 'Café', threshold: 5, quantity: 10, belowThreshold: false }]);
     await expect(fetchProducts()).rejects.toThrow();
   });
 

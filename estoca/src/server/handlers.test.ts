@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createDb } from '../db/schema';
 import { MovementsRepo } from '../db/movements-repo';
+import { ProductsRepo } from '../db/products-repo';
 import { getProducts, postMovement, postAdjustment } from './handlers';
 import { productsResponse, movement, errorResponse, adjustmentResult, staleCount } from '../contract';
 
@@ -9,27 +10,30 @@ const actor = { id: 'u-ana', username: 'ana', name: 'Ana', role: 'owner' as cons
 
 describe('GET /products honors the contract', () => {
   let repo: MovementsRepo;
+  let products: ProductsRepo;
   beforeEach(() => {
-    repo = new MovementsRepo(createDb());
+    const db = createDb();
+    repo = new MovementsRepo(db);
+    products = new ProductsRepo(db);
   });
 
   it('returns the catalogue with Stock derived from the ledger, in contract shape', () => {
     repo.recordMovement({ productId: 'p-cafe', kind: 'entry', quantity: 10, reason: 'compra', actorId: actor.id, at });
 
-    const res = getProducts(repo, actor);
+    const res = getProducts(products, actor);
 
     expect(res.status).toBe(200);
     // The response parses against the contract — the shape the frontend was promised.
-    const products = productsResponse.parse(res.body);
-    const cafe = products.find((p) => p.id === 'p-cafe')!;
+    const list = productsResponse.parse(res.body);
+    const cafe = list.find((p) => p.id === 'p-cafe')!;
     expect(cafe.stock).toBe(10);
-    expect(cafe.stockout).toBe(false); // 10 > threshold 5
+    expect(cafe.belowThreshold).toBe(false); // 10 > threshold 5
   });
 
-  it('marks a Product with Stock at or below its threshold as in Stockout', () => {
+  it('marks a Product with Stock at or below its threshold as low on Stock', () => {
     // No movements: every Product sits at Stock 0, at or below its threshold.
-    const products = productsResponse.parse(getProducts(repo, actor).body);
-    expect(products.every((p) => p.stock === 0 && p.stockout)).toBe(true);
+    const list = productsResponse.parse(getProducts(products, actor).body);
+    expect(list.every((p) => p.stock === 0 && p.belowThreshold)).toBe(true);
   });
 });
 
@@ -227,7 +231,7 @@ describe('the contract has teeth — a drifted response is caught at the boundar
       listProductViews: () => [
         { id: 'p-cafe', name: 'Café molido 500g', threshold: 5, quantity: 10, stockout: false },
       ],
-    } as unknown as MovementsRepo;
+    } as unknown as ProductsRepo;
 
     expect(() => getProducts(driftedRepo, actor)).toThrow();
   });

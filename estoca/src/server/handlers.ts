@@ -12,14 +12,17 @@
 // ledger, and the actor stamped on a movement is the session's user, never the caller's claim.
 
 import type { MovementsRepo } from '../db/movements-repo';
+import type { ProductsRepo } from '../db/products-repo';
 import type { AuthRepo, SessionUser } from '../db/auth-repo';
-import { canRecordMovement, canRecordAdjustment } from '../authz';
+import { canRecordMovement, canRecordAdjustment, canSetThreshold } from '../authz';
 import { planAdjustment } from '../domain';
 import {
   movementInput,
   adjustmentInput,
+  setThresholdInput,
   credentials as credentialsSchema,
   productsResponse,
+  productView as productViewSchema,
   movementsResponse,
   movement as movementSchema,
   sessionUser as sessionUserSchema,
@@ -98,11 +101,35 @@ export function me(actor: SessionUser | null): HandlerResult<SessionUser | Error
 
 /** `GET /products` — the catalogue with each Product's derived Stock. Requires a session. */
 export function getProducts(
-  repo: MovementsRepo,
+  products: ProductsRepo,
   actor: SessionUser | null,
 ): HandlerResult<ProductView[] | ErrorResponse> {
   if (!actor) return UNAUTHENTICATED;
-  return { status: 200, body: productsResponse.parse(repo.listProductViews()) };
+  return { status: 200, body: productsResponse.parse(products.listProductViews()) };
+}
+
+/**
+ * `PATCH /products` — set a Product's low-stock threshold. Owner-only, and the guard turns on
+ * the role alone: a non-owner is refused (403) BEFORE the body is parsed, so nothing is stored
+ * and a forbidden caller cannot even probe the payload rules. A malformed or out-of-range
+ * threshold is then refused at the edge (422) with the domain's own message. The accepted change
+ * is stamped with the acting owner and recorded (attribution), and the updated Product view is
+ * returned so the screen can reflect the new low-stock state without a reload.
+ */
+export function setThreshold(
+  products: ProductsRepo,
+  actor: SessionUser | null,
+  rawBody: unknown,
+  now: string = new Date().toISOString(),
+): HandlerResult<ProductView | ErrorResponse> {
+  if (!actor) return UNAUTHENTICATED;
+  if (!canSetThreshold(actor.role)) return FORBIDDEN;
+  const parsed = setThresholdInput.safeParse(rawBody);
+  if (!parsed.success) return { status: 422, body: { error: firstIssue(parsed.error) } };
+
+  const updated = products.setThreshold(parsed.data.productId, parsed.data.threshold, actor.id, now);
+  if (!updated) return { status: 404, body: { error: 'No existe ese Product.' } };
+  return { status: 200, body: productViewSchema.parse(updated) };
 }
 
 /** `GET /movements` — the recent ledger, each movement carrying who recorded it. */

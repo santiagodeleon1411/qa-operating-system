@@ -167,7 +167,7 @@ function renderApp(products: ProductView[], movements: Movement[]): void {
         <tbody>
           ${products
             .map((p) => {
-              const badge = p.stockout
+              const badge = p.belowThreshold
                 ? '<span class="badge badge-out">Stockout</span>'
                 : '<span class="badge badge-ok">OK</span>';
               return `<tr>

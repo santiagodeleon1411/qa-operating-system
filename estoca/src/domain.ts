@@ -11,9 +11,28 @@ export type MovementKind = 'entry' | 'exit';
 export interface Product {
   id: string;
   name: string;
-  /** The Merchant-defined Stock level at or below which the Product is in Stockout. */
-  threshold: number;
+  /**
+   * The Merchant-defined Stock level at or below which the Product warns as low on Stock.
+   * `null` means the owner has not set one yet — a real "unset" state, distinct from an
+   * explicit value — and it resolves to `DEFAULT_THRESHOLD` on read (see `effectiveThreshold`).
+   */
+  threshold: number | null;
 }
+
+/**
+ * The threshold a Product with none set falls back to. The default must fail toward the
+ * ALERT, never toward silence: a silent stockout is the worst outcome for the owner, while a
+ * false low-stock warning is only noise. So an unset Product warns as if its threshold were 5.
+ */
+export const DEFAULT_THRESHOLD = 5;
+
+/**
+ * The closed sanity range a settable threshold must fall in. The upper bound is a DEFENSIVE
+ * cap against typos and abuse, not a model of the business (a shop reorders in tens or low
+ * hundreds) — revisit if Estoca grows to high-volume SKUs. See docs specs / issue #21.
+ */
+export const THRESHOLD_MIN = 0;
+export const THRESHOLD_MAX = 10_000;
 
 /** A recorded event that changes Stock. Stock is always the sum of its movements. */
 export interface StockMovement {
@@ -35,9 +54,30 @@ export function stockOf(productId: string, movements: readonly StockMovement[]):
     .reduce((sum, m) => sum + (m.kind === 'entry' ? m.quantity : -m.quantity), 0);
 }
 
-/** A Product is in Stockout when its Stock reaches or drops below its threshold. */
-export function isStockout(product: Product, movements: readonly StockMovement[]): boolean {
-  return stockOf(product.id, movements) <= product.threshold;
+/** A Product's effective low-stock threshold: its own, or the default when the owner set none. */
+export function effectiveThreshold(product: Product): number {
+  return product.threshold ?? DEFAULT_THRESHOLD;
+}
+
+/** A Product is low on Stock when its Stock reaches or drops below its effective threshold. */
+export function isBelowThreshold(product: Product, movements: readonly StockMovement[]): boolean {
+  return stockOf(product.id, movements) <= effectiveThreshold(product);
+}
+
+/**
+ * Validate a threshold the owner is trying to set, rejecting the inputs that a low-stock
+ * setting must never hold: a non-whole number, or one outside the closed sanity range. A
+ * value that fails here is not stored — the threshold, like a movement, is refused before it
+ * can reach the store. Returns the value unchanged when it is valid, for use at the boundary.
+ */
+export function assertValidThreshold(value: number): number {
+  if (!Number.isInteger(value)) {
+    throw new Error('El umbral debe ser un número entero.');
+  }
+  if (value < THRESHOLD_MIN || value > THRESHOLD_MAX) {
+    throw new Error(`El umbral debe estar entre ${THRESHOLD_MIN} y ${THRESHOLD_MAX}.`);
+  }
+  return value;
 }
 
 /**
