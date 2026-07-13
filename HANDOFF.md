@@ -1,106 +1,126 @@
 # HANDOFF — QA Operating System
 
-**Fecha:** 2026-07-05
-**Estado:** Stage 1 EN CURSO. Dos fichas de proceso completas (control de versiones + gate
-de CI). Esperando elegir/diseñar la siguiente ficha del Stage 1.
+**Fecha:** 2026-07-13
+**Estado:** Stage 2, arco del **laboratorio de testing delegado a IA**. Esta sesión corrió la
+**primera feature por la cinta nueva casi entera**: resolvió el unknown que la frenaba (escena con
+Ana), aprobó el diseño (mockup), y **el agente (Claude) derivó los 28 casos de prueba**, que el
+usuario revisó, ajustó (metió un tope y una decisión de multi-sesión) y **aprobó**. Todo subido y
+trazable a los issues. **Cortamos justo antes de construir la feature.** El planning del charter (v1)
+está **completo**; lo que sigue es implementación real.
 
 ---
 
 ## ▶ AL RETOMAR — leé esto primero
 
-No hay que rehacer nada. **El producto de Genesis está construido y verificado, y el
-Stage 1 arrancó con dos fichas ya completas.** Se retoma eligiendo la próxima ficha
-(ver "Decisión pendiente" al final).
+**PUNTO EXACTO DE CORTE:** la task **#21 está Ready con su test plan aprobado y subido**. El paso de
+*planning* del charter terminó (agente redactó → humano revisó/ajustó/OK). El usuario eligió cortar
+acá y pidió handoff.
 
-Antes de responder, **mirá los artefactos** (existen, no los dupliques):
-- Repo: **https://github.com/santiagodeleon1411/qa-operating-system** (PÚBLICO)
-- ADRs `docs/adr/0001`…`0004` — el 0004 (gate de CI) supersede el "no CI" del 0003.
-- `estoca/` — producto corriendo (Vite + TS). `estoca/README.md` explica correr/testear.
-- `docs/qa/genesis-manual-test-execution.md` — registro manual firmado de Genesis.
-- `showcase/` — accesos `.command` doble-clickeables al producto tangible.
-- Fundación: `PROJECT.md`, `HOW_WE_WORK.md`, `CONTEXT.md`, `CLAUDE.md`.
+**Próximo paso:** **construir la feature del umbral por producto**, por capas, ejercitando los 28
+casos del test plan de a uno:
+1. **Backend primero** — campo `threshold` por producto, endpoint para setearlo (auth: owner-only,
+   403 a no-owner), validación `entero 0–10000`, `belowThreshold = (stock <= threshold ?? 5)` en
+   `GET /products`. Reemplaza el badge hard-codeado de umbral 5. → tests **contract/unit** (TC-07..17,
+   11b/c, 16).
+2. **Frontend + diseño** — badge por producto que refleja `belowThreshold` (la UI NO recomputa),
+   control de umbral visible **solo al owner**, actualización sin reload. → tests **component**
+   (TC-18..22) y **design numérico** tolerancia cero (TC-23/24) contra el mockup.
+3. **E2E** (TC-01..06) con Playwright — el usuario lo está aprendiendo en el trabajo, **enseñar a
+   fondo** (memoria `playwright-real-job`).
+4. **Manual** (TC-25/26) — juicio del humano, no se automatiza.
 
-## Rol y estilo (CRÍTICO para la voz de la sesión)
-- Claude es **mentor de QA / thought partner**, NO asistente. Desafía supuestos, explica
-  trade-offs, adapta a la madurez de la empresa.
-- **El usuario pidió explícitamente NO ser rubber-stamp:** en decisiones importantes,
-  **él se compromete primero** con una postura y su porqué; recién ahí Claude discute,
-  a veces defendiendo la opción contraria. Discrepar es el objetivo. (Ver esta dinámica
-  en acción en la sesión: varias veces el usuario razonó bien solo y se lo reforzó; una
-  vez Claude se equivocó — "arrancás solo" — y el ADR-0003 le dio la razón al usuario.)
-- **Artefactos en inglés, conversación en español.**
-- **Ritmo:** pocos términos nuevos por vez, chequear comprensión. El usuario se abruma
-  con jerga acumulada. Explicar conceptos en criollo (ej.: se explicó "invariante" de cero).
-- Filosofía: cada herramienta entra **cuando el dolor la justifica**, de a una ficha.
+**NO re-derives los casos** (están aprobados y en #21). **NO re-litigues** el tope, el default ni el
+multi-sesión (decididos abajo).
 
-## Canon de la simulación (NO volver a confundir)
-- Estoca en Genesis = **3 personas, pre-PMF** (ADR-0003). El usuario es **ingeniero #1,
-  el único que escribe código**. El escenario elegido para Stage 1 fue **"crece la carga
-  y no das abasto" → entra el ingeniero #2** (tracción, tono de planificación fría, no susto).
-- Invariante sagrado: **"el Stock nunca miente"** — Stock derivado de los movimientos,
-  nunca un contador mutable. Ya está hecho estructura en el código + safety net.
-- (Memoria persistida en `estoca-genesis-canon` con esto.)
+## Artefactos de ESTA sesión (existen, NO duplicar — referenciar)
+- **Test plan completo (28 casos):** comentario en **#21** →
+  https://github.com/santiagodeleon1411/qa-operating-system/issues/21#issuecomment-4953011848
+  Trazable a cada AC, a la altura correcta, expected explícito. Es el output del agente per charter.
+- **#21 (padre)** actualizado: unknown cerrado en la spec, edge case del tope, sección **Known
+  limitations** (multi-sesión, tope, durabilidad).
+- **#22 (BE)** actualizado: **BE3 = entero 0–10000** + comentario con rationale del tope + TC-11b/c.
+- **#23 (FE+diseño)**: sin cambios esta sesión; los 7 design tokens siguen congelados.
+- **Mockup:** `docs/mockups/21-low-stock-threshold/badge.html` + `badge.png`. Es el **design source
+  of record** (Ruta B) y el screenshot para la futura presentación a recruiters. **Sin commitear.**
+- **DoD:** `docs/DEFINITION_OF_DONE.md` — nuevo **check #4** (tarea con diseño → mockup+PNG bajo
+  `docs/mockups/`). **Sin commitear.**
 
-## Qué se construyó en esta sesión (detalle en commits/ADRs)
-1. **Producto Genesis materializado** — `estoca/`: web clickeable (ver Stock derivado,
-   registrar movimiento, sin botón de "editar stock"), + safety net Vitest (9 tests) sobre
-   el invariante, con la historia rojo-a-verde del "contador mutable". Verificado:
-   `npm test` 9/9, build OK, dev server HTTP 200.
-2. **`showcase/`** — 3 accesos `.command` (abrir web / correr tests / ver pruebas manuales)
-   + README con tabla de artefactos QA por etapa.
-3. **Ficha #1 Stage 1 — control de versiones:** `git init` + repo GitHub. Todo el proyecto
-   como UN repo. `gh` autenticado como `santiagodeleon1411`; `gh auth setup-git` ya corrido
-   (git push funciona).
-4. **Ficha #2 Stage 1 — gate de merge:** PR obligatorio + `Protect main` ruleset [active]
-   + CI (GitHub Actions) que corre el safety net en cada PR. ADR-0004. **El check requerido
-   se llama `Estoca — safety net`.** PR #1 ya mergeado a `main`.
+## Decisiones tomadas ESTA sesión (no re-litigar)
+- **Default de umbral (unknown cerrado):** producto sin umbral → **cae al 5 global**. Razón de Ana
+  (dueña): *el default debe fallar hacia el aviso, nunca hacia el silencio* — un faltante silencioso
+  es lo peor; un falso aviso es solo ruido. Confirmado por comentario en #21/#22.
+- **Tope del umbral = 10.000** (rango `0–10000`, cerrado en BE3). Es un **guard defensivo** contra
+  tipeos/abuso, NO un modelo del negocio (un almacén reordena en decenas/bajos cientos). Flag: revisar
+  si Estoca crece a SKUs de alto volumen.
+- **Multi-sesión: NO se implementa nada, se documenta.** Se separó (A) sync en vivo cross-session vs
+  (B) single-session-por-dispositivo. **Ambas declinadas** por ROI/madurez: B rompe el uso multi-
+  dispositivo legítimo de Ana y no hay driver de seguridad; A es infra cara para beneficio marginal.
+  Se acepta **desfase acotado documentado** (pantalla refleja al cargar / próxima acción). Si aparece
+  driver: polling liviano primero, websockets después. Queda en Known limitations de #21.
+- **Badge = lectura pública** (lo ven todos los roles); el **control** de umbral es owner-only.
+- **Mockup por tarea = práctica durable** → ahora check #4 del DoD. Motivo: presentación visual a
+  recruiters + design source of record. (Memoria `mockup-per-task`.)
 
-## Decisión "público vs privado" (importante)
-- El branch protection **no existe en repos privados del plan free** (403: "Upgrade to Pro
-  or make public"). Para darle **dientes** al gate, el usuario eligió **hacer el repo
-  público**. Es reversible.
-- **COMPROMISO PENDIENTE DE CLAUDE:** avisarle proactivamente al usuario **si/ cuándo
-  conviene volver a privado** (ej.: si se agrega algo sensible, o si quiere "esconder" una
-  etapa a medio hacer antes de mostrarla a un recruiter puntual). Tenerlo presente.
+## Estado git al cortar
+- Rama: **`docs/dor-ac-altitude`** (es el branch del PR #20; ojo, los cambios de abajo NO son de ese PR).
+- **Sin commitear:** `docs/DEFINITION_OF_DONE.md` (check #4), `docs/mockups/` (nuevo), `HANDOFF.md`.
+- **Plan de encapsulado propuesto (no ejecutado):** el **mockup** viaja con la rama de la feature
+  cuando se construya (es su design source). El **check #4 del DoD** se suma al lote de PRs de
+  proceso que esperan la **escena de Matías** (#19 DoD authz, #20 DoR altura) — su revisión de ese
+  backlog ES el onboarding. Preguntar al usuario antes de commitear/ramificar.
 
-## Stack y herramientas del usuario (para recomendar en su lenguaje)
-- TS/JS **básico**, Playwright, GitHub, GitHub Actions. Cómodo con eso.
-- Instalado en la sesión: Node 22, npm, `gh` 2.96, Homebrew, git 2.55.
-- El producto usa Vite + Vitest (safety net). Playwright todavía NO entró (sería el primer
-  E2E cuando la UI se estabilice — ver watch-out en ADR-0003/0004).
+## Lo que sigue en la narrativa (plan que el usuario eligió, no re-litigar)
+- **(a) ahora:** correr esta primera feature por la cinta — planning **hecho**, falta **construir**.
+- **(b) después:** **escena de la llegada de Matías** (ing #2), que revisa el backlog de PRs de
+  proceso (#19, #20, y ahora el del DoD check #4). Jugada transparente (empresa = sim), NO con cuenta
+  burner. Matías = personaje, no cuenta real.
 
-## 🧹 Pendiente de higiene — HACER TEMPRANO al retomar
-- **Destrackear `.claude/settings.local.json`** (es config local/personal, no debería estar
-  versionada). Está en el repo desde el commit inicial y el repo es **PÚBLICO** → filtra rutas
-  con el usuario de macOS (`/Users/santiagodeleon/...`, PII de baja severidad). Fix liviano
-  (por PR): agregar `.claude/settings.local.json` al `.gitignore` + `git rm --cached` ese
-  archivo. **NO reescribir historia** salvo que el usuario lo pida (overkill para esta severidad).
+## Deferidos que siguen (avisar proactivamente cuando corresponda)
+- **Escaneo de dependencias en CI** (vuln CRÍTICA del `npm install`): deferido, sigue caliente
+  (supply-chain).
+- **Durabilidad de la DB** (in-memory, resetea) + migraciones — ahora más visible: el umbral no
+  sobrevive un restart. En Known limitations de #21.
+- Flag `Secure` de la cookie (prod/HTTPS); fix de timing en `authenticate` (hash dummy); cola de
+  revisión de faltantes (v2 maker-checker).
+- **v2 del charter:** ejecución-con-veredicto autónomo (hoy v1 = solo planning) + ambiente corriendo.
+  Deferido a "cuando el arnés esté probado".
+- **Branch protection en main: intencionalmente APAGADA.** Estándar documentado (DoD/DoR/charter), no
+  gate vivo, hasta que exista cuenta de revisor real. **NO re-prender.** (Memoria `review-gate-posture`.)
+- Cuentas + perfiles de dev reales: idea del usuario "el día de mañana". No ahora.
 
-## Preguntas abiertas (diferidas a propósito)
-- **Offline** (comercios con internet flojo): MVP online-only, sin resolver.
-- Nombre "Estoca" sigue provisional.
-- Horizonte de "hasta dónde llega la simulación".
+## Rol y estilo (CRÍTICO — no cambió)
+- Claude = **mentor de QA / thought partner**, NO asistente. Desafía supuestos, explica trade-offs,
+  lente de madurez/ROI en cada recomendación de tooling. (CLAUDE.md.) Esta sesión peleó bien el tope,
+  el multi-sesión y el default — salieron mejores decisiones de esas tensiones.
+- **El usuario NO quiere rubber-stamp:** se compromete con postura + porqué; ahí Claude discute (a
+  veces defendiendo la contraria).
+- **Voz de artefactos = seria, técnica, EN INGLÉS, sin metáforas** (issues, DoD, test plan, mockup).
+  Conversación en criollo. (Memorias `artifact-voice`.)
+- **Se engancha con la evolución de ROLES/narrativa** → escenas con personajes con nombre. Cast:
+  **Sofía** (PM), **Matías** (ing #2, próxima escena), **Ana** (dueña), **Bruno** (empleado), **Caro**
+  (cadete). (`narrative-fuels-engagement`.)
+- **Playwright lo aprende en el trabajo** → enseñar E2E a fondo cuando se llegue a TC-01..06.
+  (`playwright-real-job`.)
+- **Saltos de fase grandes**, norte = QA ecosystem entendible/escalable/**vendible**;
+  **la honestidad vende**. (`phase-granularity`.)
+- **Guardar SIEMPRE al cerrar.** (`save-on-leave`.)
 
-## Suggested skills / tooling
-- **`/handoff`** — este doc.
-- Próximas fichas naturales del Stage 1 (introducir de a UNA, con discusión previa):
-  **"definición de listo" + revisión humana** del ingeniero #2, **GitHub Issues** como
-  gestión de tareas coherente para 2 personas (crece a tablero cuando haga falta), y más
-  adelante el **primer Playwright E2E**. El **revisor de IA (Copilot)** quedó explícitamente
-  postergado: no conoce el invariante, no puede ser su guardián (ver ADR-0004).
-- Cuando toque tocar código del producto: `/run` (levantar la app) y `/code-review` sobre PRs.
+## Stack y comandos
+- Vite + Vitest + `better-sqlite3` + `zod` + `tsx` + `@playwright/test`. Auth/authz sin dep nueva.
+- **Correr la app:** `npm run dev:api` (:3001) + `npm run dev` (:5173, proxy /api). DB in-memory.
+- **Tests:** `npm test` (vitest), `npm run test:e2e` (playwright), `npx tsc --noEmit`.
+- **Screenshot de mockup:** `npx playwright screenshot --full-page <file.html> <file.png>`.
+- **Login dev:** `ana`/`estoca-ana` (dueña), `bruno`/`estoca-bruno` (empleado), `caro`/`estoca-caro`
+  (cadete).
+- **Charter del agente:** `docs/qa/ai-testing-agent-charter.md` en la rama **`docs/ai-testing-agent`**
+  (BORRADOR, sin PR aún). Es el marco que gobierna el paso de derivación de casos.
+- `gh` con scope `project` ya configurado. Repo: `santiagodeleon1411/qa-operating-system`.
+- Board: https://github.com/users/santiagodeleon1411/projects/1 (campo Stage).
 
----
-
-## ⏳ DECISIÓN PENDIENTE — próxima ficha del Stage 1
-
-El gate protege el invariante de forma determinística. Pero quedan huecos que los tests
-NO cubren (diseño, contexto, legibilidad, cosas que el ingeniero #2 podría hacer distinto).
-**Preguntar al usuario cuál ficha sigue** — dejar que se comprometa primero:
-- **Revisión humana + "definición de listo"** (qué significa que un cambio está terminado
-  y listo para mergear, más allá de que el CI pase). ← candidato más natural.
-- **GitHub Issues** para gestionar el trabajo de los dos (evidencia de flujo de equipo real,
-  del tamaño real: 2 personas, no un sprint board inflado).
-- Otra que proponga el usuario.
-
-No railroad-ear: presentar el hueco, pedirle su postura y su porqué, después discutir.
+## Suggested skills (para la próxima sesión)
+- **`run`** — levantar la app para ver el badge/UI a medida que se construye la feature.
+- **`verify`** — ejercitar la feature del umbral de punta a punta una vez implementada.
+- **`code-review`** — sobre el diff de la feature una vez construida.
+- **`security-review`** — el endpoint de setear umbral toca autorización (owner-only); vale un pase.
+- **`handoff`** — al cerrar la próxima sesión, re-compactar el estado.
+- (El "agente de testing" del charter se juega con Claude mismo; no es una skill.)
