@@ -91,10 +91,23 @@ export class EstocaPage {
     return this.row(productName).locator('.thr-input');
   }
 
-  /** Set a Product's low-stock threshold through the owner's inline control, then Save. */
+  /**
+   * Set a Product's low-stock threshold through the owner's inline control, then Save — and wait
+   * for the save to COMPLETE before returning. Saving fires an in-place re-render (onSaveThreshold
+   * rebuilds the whole screen from the server's response); a caller that touched a form before that
+   * re-render landed would have its inputs wiped mid-interaction — the form would be replaced under
+   * it and the submit would carry the fresh form's defaults instead. Waiting for the PATCH response
+   * closes that race deterministically: the next Playwright command is a fresh round-trip to the
+   * browser, a macrotask boundary that flushes the synchronous re-render first. Resolves on any
+   * response, including a rejection (400/403), so the validation paths still return rather than hang.
+   */
   async setThreshold(productName: string, value: number): Promise<void> {
     await this.thresholdInput(productName).fill(String(value));
+    const saved = this.page.waitForResponse(
+      (r) => r.request().method() === 'PATCH' && r.url().includes('/products'),
+    );
     await this.row(productName).locator('.thr-save').click();
+    await saved;
   }
 
   /** The status/error line under the stock table (owner-only; threshold validation surfaces here). */
@@ -130,6 +143,31 @@ export class EstocaPage {
   /** The inline error line under the movement form (empty when there is no error). */
   get movementError(): Locator {
     return this.page.locator('#error');
+  }
+
+  /**
+   * Bring a Product's Stock to an EXACT value, the way the app allows it: never by writing Stock
+   * (there is no such control — Stock is derived), but by recording the one movement that closes
+   * the gap. Reads the current Stock, then records an entry or an exit for the difference.
+   *
+   * Recording a movement kicks off a full re-load of the shop (renderLoading → renderApp), so
+   * this waits until the NEW Stock is actually on screen before returning — a deterministic state
+   * signal, not a timer. A caller that acted on the row before the re-load settled would be
+   * racing the re-render; waiting on the rendered value removes the race at the source.
+   */
+  async setStockTo(productName: string, target: number): Promise<void> {
+    const currentStock = await this.stockOf(productName);
+    if (currentStock === target) return; // already there — nothing to record
+    await this.recordMovement({
+      product: productName,
+      kind: currentStock < target ? 'entry' : 'exit',
+      quantity: Math.abs(target - currentStock),
+      reason: 'baseline for a low-stock test',
+    });
+    // The Stock cell now carries exactly `target`. Match it whole (^N$) so 1 does not match 11.
+    await this.row(productName)
+      .locator('td.stock', { hasText: new RegExp(`^${target}$`) })
+      .waitFor();
   }
 
   /** Reconcile a Product to a physical count through the "Adjust by physical count" form. */

@@ -62,16 +62,23 @@ test('an out-of-range threshold is refused with the backend message, badge uncha
   await expect(estoca.thresholdMessage).toHaveText('The threshold must be between 0 and 10000.');
 });
 
-test('the threshold control is withheld from non-owners (TC-21)', async ({ page }) => {
-  const estoca = new EstocaPage(page);
-  await estoca.login(LOGINS.bruno.username, LOGINS.bruno.password);
+// The threshold control is the owner's alone. Both non-owner roles are checked from the UI
+// (TC-21 component / TC-06 e2e): the employee AND the runner. The 403 on PATCH /products is the
+// real guarantee (TC-10, contract) — here we assert the screen never even offers the control, for
+// every role that must not have it, so the two named roles are covered, not just one.
+for (const role of [LOGINS.bruno, LOGINS.caro] as const) {
+  test(`the threshold control is withheld from the ${role.role} (TC-21/TC-06)`, async ({ page }) => {
+    const estoca = new EstocaPage(page);
+    await estoca.login(role.username, role.password);
 
-  // The column and every control are absent for the employee...
-  expect(await estoca.stockHeaders()).not.toContain('THRESHOLD');
-  await expect(page.locator('.thr-input')).toHaveCount(0);
+    // The column and every control are absent for this role...
+    expect(await estoca.stockHeaders()).not.toContain('THRESHOLD');
+    await expect(page.locator('.thr-input')).toHaveCount(0);
+    await expect(page.locator('.thr-save')).toHaveCount(0);
 
-  // ...but the low-stock signal itself is for everyone — it is the control, not the badge, that is
-  // owner-only. Sugar seeds at Stock 0 under a threshold of 10, so it is always below threshold: a
-  // badge renders for the employee too.
-  await expect(estoca.lowStockBadge(PRODUCTS.azucar)).toBeVisible();
-});
+    // ...but the low-stock signal itself is for everyone — it is the control, not the badge, that
+    // is owner-only. Sugar seeds at Stock 0 under a threshold of 10, so it is always below
+    // threshold: a badge renders for the non-owner too.
+    await expect(estoca.lowStockBadge(PRODUCTS.azucar)).toBeVisible();
+  });
+}
