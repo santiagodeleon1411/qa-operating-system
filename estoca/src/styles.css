@@ -86,11 +86,13 @@ td.stock {
    commit is unambiguous (the interaction diverges from the mockup, which shows a bare field —
    the mockup is the source of record for the badge tokens, not for this control's behaviour). */
 .thr-input {
-  width: 64px;
+  width: 80px;
   text-align: right;
   font: inherit;
   font-variant-numeric: tabular-nums;
-  padding: 0.35rem 0.5rem;
+  /* Extra right padding reserves a gutter for the native number spinner, so the value no longer
+     collides with the up/down arrows — the field stays comfortable to nudge (manual TC-26). */
+  padding: 0.35rem 1.5rem 0.35rem 0.5rem;
 }
 
 .thr-save {
