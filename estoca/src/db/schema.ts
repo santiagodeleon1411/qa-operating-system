@@ -80,7 +80,7 @@ BEFORE INSERT ON movements
 WHEN NEW.kind = 'exit'
  AND (SELECT stock FROM product_stock WHERE product_id = NEW.product_id) < NEW.quantity
 BEGIN
-  SELECT RAISE(ABORT, 'Una salida no puede dejar el Stock en negativo.');
+  SELECT RAISE(ABORT, 'An exit cannot leave Stock negative.');
 END;
 `;
 

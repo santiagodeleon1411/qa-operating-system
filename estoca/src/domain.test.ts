@@ -53,7 +53,7 @@ describe('Stock is derived, never stored — "the Stock never lies"', () => {
 });
 
 describe('Low-stock alerting', () => {
-  const product: Product = { id: 'p1', name: 'Café', threshold: 5 };
+  const product: Product = { id: 'p1', name: 'Coffee', threshold: 5 };
 
   it('does not fire above the threshold', () => {
     expect(isBelowThreshold(product, [mov('p1', 'entry', 6)])).toBe(false);
@@ -67,7 +67,7 @@ describe('Low-stock alerting', () => {
   // BE4: a Product with no threshold set falls back to the default — and the default fails
   // toward the alert (Ana's rule), so an unset Product at Stock 5 warns, at Stock 6 does not.
   it('falls back to the default threshold when the owner set none', () => {
-    const unset: Product = { id: 'p1', name: 'Nuevo', threshold: null };
+    const unset: Product = { id: 'p1', name: 'New', threshold: null };
     expect(effectiveThreshold(unset)).toBe(DEFAULT_THRESHOLD);
     expect(isBelowThreshold(unset, [mov('p1', 'entry', DEFAULT_THRESHOLD)])).toBe(true);
     expect(isBelowThreshold(unset, [mov('p1', 'entry', DEFAULT_THRESHOLD + 1)])).toBe(false);
@@ -108,7 +108,7 @@ describe('A movement that would make the Stock lie is rejected', () => {
 
 describe('A physical count becomes an adjustment movement, never a stored Stock', () => {
   const adjust = (counted: number, snapshotStock: number) =>
-    planAdjustment({ productId: 'p1', counted, snapshotStock, reason: 'conteo', at });
+    planAdjustment({ productId: 'p1', counted, snapshotStock, reason: 'count', at });
 
   it('records the difference as an exit when the count is below the system', () => {
     const m = adjust(39, 42)!;
@@ -138,7 +138,7 @@ describe('A physical count becomes an adjustment movement, never a stored Stock'
   });
 
   it('refuses a negative or non-whole count', () => {
-    expect(() => adjust(-3, 42)).toThrow('negativo');
-    expect(() => adjust(3.5, 42)).toThrow('enteros');
+    expect(() => adjust(-3, 42)).toThrow('negative');
+    expect(() => adjust(3.5, 42)).toThrow('whole');
   });
 });

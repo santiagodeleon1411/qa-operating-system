@@ -22,12 +22,12 @@ export const movementKind = z.enum(['entry', 'exit']);
  * in another timezone, and in an append-only ledger "when" is not a value to trust to the
  * caller). The domain rules are mirrored here so a malformed request is refused at the edge.
  */
-const quantityRule = 'Una cantidad debe ser un número entero positivo.';
+const quantityRule = 'A quantity must be a positive whole number.';
 export const movementInput = z.object({
-  productId: z.string().min(1, 'Falta indicar el Product.'),
+  productId: z.string().min(1, 'The Product is required.'),
   kind: movementKind,
   quantity: z.number({ error: quantityRule }).int(quantityRule).positive(quantityRule),
-  reason: z.string().refine((s) => s.trim().length > 0, 'Un movimiento debe registrar un motivo.'),
+  reason: z.string().refine((s) => s.trim().length > 0, 'A movement must record a reason.'),
 });
 export type MovementInput = z.infer<typeof movementInput>;
 
@@ -54,8 +54,8 @@ export type MovementsResponse = z.infer<typeof movementsResponse>;
 
 /** The body of `POST /login`: the credentials a user submits. */
 export const credentials = z.object({
-  username: z.string().min(1, 'Falta el usuario.'),
-  password: z.string().min(1, 'Falta la contraseña.'),
+  username: z.string().min(1, 'Username is required.'),
+  password: z.string().min(1, 'Password is required.'),
 });
 export type Credentials = z.infer<typeof credentials>;
 
@@ -100,10 +100,10 @@ export type ProductsResponse = z.infer<typeof productsResponse>;
  * refused at the edge with the domain's own message — the same discipline `movementInput`
  * applies to a quantity. The upper bound is a defensive cap, not a business model (issue #21).
  */
-const thresholdIntRule = 'El umbral debe ser un número entero.';
-const thresholdRangeRule = `El umbral debe estar entre ${THRESHOLD_MIN} y ${THRESHOLD_MAX}.`;
+const thresholdIntRule = 'The threshold must be a whole number.';
+const thresholdRangeRule = `The threshold must be between ${THRESHOLD_MIN} and ${THRESHOLD_MAX}.`;
 export const setThresholdInput = z.object({
-  productId: z.string().min(1, 'Falta indicar el Product.'),
+  productId: z.string().min(1, 'The Product is required.'),
   threshold: z
     .number({ error: thresholdIntRule })
     .int(thresholdIntRule)
@@ -129,12 +129,12 @@ export type ErrorResponse = z.infer<typeof errorResponse>;
  * domain, with the domain's messages. See docs/specs/stock-count-adjustment.md.
  */
 export const adjustmentInput = z.object({
-  productId: z.string().min(1, 'Falta indicar el Product.'),
+  productId: z.string().min(1, 'The Product is required.'),
   counted: z.number(),
   // Closed set, not free text: the reason is the unit of authorization (a theft-or-loss
   // classification is owner-only), so the server owns the vocabulary rather than trusting the
   // caller's string. See src/authz.ts and docs/specs/authorization-role-model.md.
-  reason: z.enum(ADJUSTMENT_REASONS, { error: 'Motivo de ajuste inválido.' }),
+  reason: z.enum(ADJUSTMENT_REASONS, { error: 'Invalid adjustment reason.' }),
   expectedStock: z.number().int(),
   confirmed: z.boolean().optional(),
 });

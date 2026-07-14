@@ -15,10 +15,10 @@ test('an exit larger than the Stock is refused and leaves the Stock untouched', 
     product: PRODUCTS.azucar,
     kind: 'exit',
     quantity: before + 1,
-    reason: 'Venta',
+    reason: 'Sale',
   });
 
-  await expect(estoca.movementError).toHaveText('Una salida no puede dejar el Stock en negativo.');
+  await expect(estoca.movementError).toHaveText('An exit cannot leave Stock negative.');
   // The refusal is not cosmetic: the derived Stock is exactly what it was before the attempt.
   await expect(estoca.stockCell(PRODUCTS.azucar)).toHaveText(String(before));
 });

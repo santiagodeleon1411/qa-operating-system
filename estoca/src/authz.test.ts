@@ -32,7 +32,7 @@ describe('adjustment permissions (reason × role)', () => {
   // open to owner and employee.
   const allows: Record<Role, (reason: AdjustmentReason) => boolean> = {
     owner: () => true,
-    employee: (r) => r !== 'Robo o pérdida',
+    employee: (r) => r !== 'Theft or loss',
     runner: () => false,
   };
   for (const role of ROLES) {
@@ -47,12 +47,12 @@ describe('adjustment permissions (reason × role)', () => {
 
 describe('the load-bearing control: segregation of duties on theft', () => {
   it('only the owner may classify a shortfall as theft or loss', () => {
-    expect(canRecordAdjustment('owner', 'Robo o pérdida')).toBe(true);
-    expect(canRecordAdjustment('employee', 'Robo o pérdida')).toBe(false);
-    expect(canRecordAdjustment('runner', 'Robo o pérdida')).toBe(false);
+    expect(canRecordAdjustment('owner', 'Theft or loss')).toBe(true);
+    expect(canRecordAdjustment('employee', 'Theft or loss')).toBe(false);
+    expect(canRecordAdjustment('runner', 'Theft or loss')).toBe(false);
   });
 
   it('the employee can still record the shortfall, just not classify it as theft', () => {
-    expect(canRecordAdjustment('employee', 'Faltante sin clasificar')).toBe(true);
+    expect(canRecordAdjustment('employee', 'Unclassified shortfall')).toBe(true);
   });
 });

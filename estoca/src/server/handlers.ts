@@ -45,7 +45,7 @@ const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 const UNAUTHENTICATED: HandlerResult<ErrorResponse> = {
   status: 401,
-  body: { error: 'Tenés que iniciar sesión para continuar.' },
+  body: { error: 'You must sign in to continue.' },
 };
 
 // 403 is a different refusal from 401: the actor IS authenticated, but their role does not permit
@@ -53,12 +53,12 @@ const UNAUTHENTICATED: HandlerResult<ErrorResponse> = {
 // here, in the tested layer, not in the transport — and it stamps nothing on the ledger.
 const FORBIDDEN: HandlerResult<ErrorResponse> = {
   status: 403,
-  body: { error: 'Tu rol no tiene permiso para esta acción.' },
+  body: { error: 'Your role is not permitted to perform this action.' },
 };
 
 /** The first human-readable reason a payload failed the contract. */
 function firstIssue(error: { issues: ReadonlyArray<{ message: string }> }): string {
-  return error.issues[0]?.message ?? 'Solicitud inválida.';
+  return error.issues[0]?.message ?? 'Invalid request.';
 }
 
 // --- Identity -------------------------------------------------------------------------------
@@ -78,7 +78,7 @@ export function login(
   if (!parsed.success) return { status: 422, body: { error: firstIssue(parsed.error) } };
 
   const user = auth.authenticate(parsed.data.username, parsed.data.password);
-  if (!user) return { status: 401, body: { error: 'Usuario o contraseña incorrectos.' } };
+  if (!user) return { status: 401, body: { error: 'Incorrect username or password.' } };
 
   const expiresAt = new Date(new Date(now).getTime() + SESSION_TTL_MS).toISOString();
   const token = auth.createSession(user.id, expiresAt);
@@ -128,7 +128,7 @@ export function setThreshold(
   if (!parsed.success) return { status: 422, body: { error: firstIssue(parsed.error) } };
 
   const updated = products.setThreshold(parsed.data.productId, parsed.data.threshold, actor.id, now);
-  if (!updated) return { status: 404, body: { error: 'No existe ese Product.' } };
+  if (!updated) return { status: 404, body: { error: 'That Product does not exist.' } };
   return { status: 200, body: productViewSchema.parse(updated) };
 }
 
@@ -186,7 +186,7 @@ export function postAdjustment(
 
   const currentStock = repo.deriveStock(productId);
   if (!confirmed && currentStock !== expectedStock) {
-    return { status: 409, body: { error: 'El Stock cambió desde que empezó el conteo.', currentStock } };
+    return { status: 409, body: { error: 'Stock changed since the count began.', currentStock } };
   }
 
   try {

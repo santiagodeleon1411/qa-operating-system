@@ -4,9 +4,9 @@ import { type Page, type Locator } from '@playwright/test';
 // over the API), so a test picks one of these three to work with. Full names, because the
 // screen renders them verbatim and we match rows by their visible text.
 export const PRODUCTS = {
-  cafe: 'Café molido 500g',
+  cafe: 'Ground coffee 500g',
   yerba: 'Yerba mate 1kg',
-  azucar: 'Azúcar 1kg',
+  azucar: 'Sugar 1kg',
 } as const;
 
 // The backend ids for those Products, needed when a test reaches PAST the screen to the API
@@ -27,7 +27,7 @@ export const LOGINS = {
 } as const;
 
 // A Page Object: the ONE place that knows how Estoca's screen is built. Tests speak in terms
-// of "log in", "record a movement" or "the Stock of the café"; only this class knows which
+// of "log in", "record a movement" or "the Stock of the coffee"; only this class knows which
 // selectors and form fields make that happen. When the UI changes, this file changes.
 export class EstocaPage {
   constructor(private readonly page: Page) {}
@@ -43,13 +43,13 @@ export class EstocaPage {
     const form = this.page.locator('#login-form');
     await form.locator('input[name=username]').fill(username);
     await form.locator('input[name=password]').fill(password);
-    await form.getByRole('button', { name: 'Entrar' }).click();
+    await form.getByRole('button', { name: 'Sign in' }).click();
   }
 
   /** Log in and wait until the shop is shown — what most tests do first. */
   async login(username: string, password: string): Promise<void> {
     await this.attemptLogin(username, password);
-    await this.page.getByRole('heading', { name: 'Stock actual' }).waitFor();
+    await this.page.getByRole('heading', { name: 'Current stock' }).waitFor();
   }
 
   /** The error line on the login form. */
@@ -57,13 +57,13 @@ export class EstocaPage {
     return this.page.locator('#login-error');
   }
 
-  /** The "Conectado como …" line in the top bar. */
+  /** The "Signed in as …" line in the top bar. */
   get connectedAs(): Locator {
     return this.page.locator('.topbar');
   }
 
   async logout(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Salir' }).click();
+    await this.page.getByRole('button', { name: 'Sign out' }).click();
   }
 
   /** The table row for a Product, located by its visible name. */
@@ -81,7 +81,7 @@ export class EstocaPage {
     return Number(await this.stockCell(productName).innerText());
   }
 
-  /** Record a movement through the "Registrar movimiento" form, as the Merchant would. */
+  /** Record a movement through the "Record movement" form, as the Merchant would. */
   async recordMovement(opts: {
     product: string;
     kind: 'entry' | 'exit';
@@ -93,7 +93,7 @@ export class EstocaPage {
     await form.locator('select[name=kind]').selectOption(opts.kind);
     await form.locator('input[name=quantity]').fill(String(opts.quantity));
     await form.locator('input[name=reason]').fill(opts.reason);
-    await form.getByRole('button', { name: 'Registrar' }).click();
+    await form.getByRole('button', { name: 'Record' }).click();
   }
 
   /** The inline error line under the movement form (empty when there is no error). */
@@ -101,13 +101,13 @@ export class EstocaPage {
     return this.page.locator('#error');
   }
 
-  /** Reconcile a Product to a physical count through the "Ajustar por conteo físico" form. */
+  /** Reconcile a Product to a physical count through the "Adjust by physical count" form. */
   async adjust(opts: { product: string; counted: number; reason: string }): Promise<void> {
     const form = this.page.locator('#adjust-form');
     await form.locator('select[name=productId]').selectOption({ label: opts.product });
     await form.locator('input[name=counted]').fill(String(opts.counted));
     await form.locator('select[name=reason]').selectOption(opts.reason);
-    await form.getByRole('button', { name: 'Registrar ajuste' }).click();
+    await form.getByRole('button', { name: 'Record adjustment' }).click();
   }
 
   /** The status line under the adjust form (staleness prompts and outcomes appear here). */
@@ -115,9 +115,9 @@ export class EstocaPage {
     return this.page.locator('#adjust-msg');
   }
 
-  /** The "Confirmar mi conteo" button shown only when the Stock changed during the count. */
+  /** The "Confirm my count" button shown only when the Stock changed during the count. */
   get reconfirmButton(): Locator {
-    return this.page.getByRole('button', { name: 'Confirmar mi conteo' });
+    return this.page.getByRole('button', { name: 'Confirm my count' });
   }
 
   /** The most recent row of the movement history — where attribution becomes visible. */
@@ -132,6 +132,6 @@ export class EstocaPage {
 
   /** The retry button offered by the unavailable state. */
   get retryButton(): Locator {
-    return this.page.getByRole('button', { name: 'Reintentar' });
+    return this.page.getByRole('button', { name: 'Retry' });
   }
 }

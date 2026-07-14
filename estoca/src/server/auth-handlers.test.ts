@@ -60,7 +60,7 @@ describe('the session guard — no write, and no read, reaches the ledger withou
   });
 
   it('refuses every protected endpoint with 401 when there is no actor', () => {
-    const body = { productId: 'p-cafe', kind: 'entry', quantity: 1, reason: 'compra' };
+    const body = { productId: 'p-cafe', kind: 'entry', quantity: 1, reason: 'purchase' };
     const adj = { productId: 'p-cafe', counted: 0, reason: 'x', expectedStock: 0 };
     for (const res of [
       getProducts(products, null),
@@ -78,8 +78,8 @@ describe('the session guard — no write, and no read, reaches the ledger withou
   it('attributes a movement to whoever is authenticated — the actor is not the caller’s to claim', () => {
     const ana = { id: 'u-ana', username: 'ana', name: 'Ana', role: 'owner' as const };
     const bruno = { id: 'u-bruno', username: 'bruno', name: 'Bruno', role: 'employee' as const };
-    postMovement(repo, ana, { productId: 'p-cafe', kind: 'entry', quantity: 5, reason: 'compra' }, at);
-    postMovement(repo, bruno, { productId: 'p-cafe', kind: 'exit', quantity: 2, reason: 'venta' }, at);
+    postMovement(repo, ana, { productId: 'p-cafe', kind: 'entry', quantity: 5, reason: 'purchase' }, at);
+    postMovement(repo, bruno, { productId: 'p-cafe', kind: 'exit', quantity: 2, reason: 'sale' }, at);
 
     const [latest, first] = repo.listMovements();
     expect(latest.actorName).toBe('Bruno');

@@ -72,10 +72,10 @@ export function isBelowThreshold(product: Product, movements: readonly StockMove
  */
 export function assertValidThreshold(value: number): number {
   if (!Number.isInteger(value)) {
-    throw new Error('El umbral debe ser un número entero.');
+    throw new Error('The threshold must be a whole number.');
   }
   if (value < THRESHOLD_MIN || value > THRESHOLD_MAX) {
-    throw new Error(`El umbral debe estar entre ${THRESHOLD_MIN} y ${THRESHOLD_MAX}.`);
+    throw new Error(`The threshold must be between ${THRESHOLD_MIN} and ${THRESHOLD_MAX}.`);
   }
   return value;
 }
@@ -93,10 +93,10 @@ export function makeMovement(input: {
   at: string;
 }): StockMovement {
   if (!Number.isInteger(input.quantity) || input.quantity <= 0) {
-    throw new Error('Una cantidad debe ser un número entero positivo.');
+    throw new Error('A quantity must be a positive whole number.');
   }
   if (!input.reason.trim()) {
-    throw new Error('Un movimiento debe registrar un motivo.');
+    throw new Error('A movement must record a reason.');
   }
   return { ...input };
 }
@@ -133,10 +133,10 @@ export function planAdjustment(input: {
   at: string;
 }): StockMovement | null {
   if (!Number.isInteger(input.counted)) {
-    throw new Error('Las unidades se cuentan en números enteros.');
+    throw new Error('Units are counted in whole numbers.');
   }
   if (input.counted < 0) {
-    throw new Error('Un conteo no puede ser negativo.');
+    throw new Error('A count cannot be negative.');
   }
   const delta = input.counted - input.snapshotStock;
   if (delta === 0) return null; // the count matches the system; nothing to adjust

@@ -76,8 +76,8 @@ export async function fetchMe(): Promise<SessionUser | null> {
 /** `GET /products` — throws NotAuthenticated on 401, so the UI can show the login screen. */
 export async function fetchProducts(): Promise<ProductView[]> {
   const res = await send('/products');
-  if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
-  if (!res.ok) throw new Error(`El backend respondió ${res.status} al pedir el stock.`);
+  if (res.status === 401) throw new NotAuthenticated('Session required.');
+  if (!res.ok) throw new Error(`The backend responded ${res.status} when requesting stock.`);
   return productsResponse.parse(await res.json());
 }
 
@@ -91,7 +91,7 @@ export async function setThreshold(input: SetThresholdInput): Promise<ProductVie
   const res = await jsonPatch('/products', input);
   const json = await res.json();
   if (res.status === 200) return productViewSchema.parse(json);
-  if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
+  if (res.status === 401) throw new NotAuthenticated('Session required.');
   if (res.status === 403) throw new Forbidden(errorResponse.parse(json).error);
   throw new ThresholdRefused(errorResponse.parse(json).error);
 }
@@ -99,8 +99,8 @@ export async function setThreshold(input: SetThresholdInput): Promise<ProductVie
 /** `GET /movements` — the recent ledger, each movement carrying who recorded it. */
 export async function fetchMovements(): Promise<Movement[]> {
   const res = await send('/movements');
-  if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
-  if (!res.ok) throw new Error(`El backend respondió ${res.status} al pedir el historial.`);
+  if (res.status === 401) throw new NotAuthenticated('Session required.');
+  if (!res.ok) throw new Error(`The backend responded ${res.status} when requesting the history.`);
   return movementsResponse.parse(await res.json());
 }
 
@@ -112,7 +112,7 @@ export async function recordMovement(input: MovementInput): Promise<Movement> {
   const res = await jsonPost('/movements', input);
   const json = await res.json();
   if (res.status === 201) return movementSchema.parse(json);
-  if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
+  if (res.status === 401) throw new NotAuthenticated('Session required.');
   if (res.status === 403) throw new Forbidden(errorResponse.parse(json).error);
   throw new MovementRefused(errorResponse.parse(json).error);
 }
@@ -135,7 +135,7 @@ export async function recordAdjustment(input: AdjustmentInput): Promise<Adjustme
     const result = adjustmentResult.parse(json);
     return result.adjusted ? { kind: 'recorded', movement: result.movement } : { kind: 'unchanged' };
   }
-  if (res.status === 401) throw new NotAuthenticated('Sesión requerida.');
+  if (res.status === 401) throw new NotAuthenticated('Session required.');
   if (res.status === 403) throw new Forbidden(errorResponse.parse(json).error);
   throw new MovementRefused(errorResponse.parse(json).error);
 }

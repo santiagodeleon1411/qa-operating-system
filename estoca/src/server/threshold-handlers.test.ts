@@ -29,7 +29,7 @@ describe('per-product low-stock threshold — backend contract (#22)', () => {
 
   /** Record an entry so a Product sits at a known Stock (Stock is only ever derived). */
   const stock = (productId: string, quantity: number) =>
-    repo.recordMovement({ productId, kind: 'entry', quantity, reason: 'compra', actorId: owner.id, at });
+    repo.recordMovement({ productId, kind: 'entry', quantity, reason: 'purchase', actorId: owner.id, at });
 
   /** The Product's view as `GET /products` would serve it, parsed against the contract. */
   const viewOf = (productId: string): ProductView =>
@@ -147,7 +147,7 @@ describe('per-product low-stock threshold — backend contract (#22)', () => {
   it('setting the threshold of an unknown Product is a 404, with no audit row', () => {
     const res = setThreshold(products, owner, { productId: 'p-nope', threshold: 7 }, at);
     expect(res.status).toBe(404);
-    expect((res.body as ErrorResponse).error).toMatch(/no existe/i);
+    expect((res.body as ErrorResponse).error).toMatch(/does not exist/i);
     expect(products.listThresholdChanges('p-nope')).toHaveLength(0);
   });
 });

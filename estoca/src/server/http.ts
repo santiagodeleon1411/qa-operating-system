@@ -72,7 +72,7 @@ function readBody(req: http.IncomingMessage): Promise<unknown> {
       try {
         resolve(raw ? JSON.parse(raw) : undefined);
       } catch {
-        reject(new Error('El cuerpo de la solicitud no es JSON válido.'));
+        reject(new Error('The request body is not valid JSON.'));
       }
     });
     req.on('error', reject);
@@ -109,14 +109,14 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/adjustments') {
       return respond(res, postAdjustment(repo, actor, await readBody(req), now));
     }
-    respond(res, { status: 404, body: { error: 'No existe ese recurso.' } });
+    respond(res, { status: 404, body: { error: 'That resource does not exist.' } });
   } catch (e) {
     // A malformed body reaches here; treat it as a rejected request, in contract shape.
-    respond(res, { status: 422, body: { error: e instanceof Error ? e.message : 'Solicitud inválida.' } });
+    respond(res, { status: 422, body: { error: e instanceof Error ? e.message : 'Invalid request.' } });
   }
 });
 
 const port = Number(process.env.PORT ?? 3001);
 server.listen(port, () => {
-  console.log(`Estoca backend escuchando en http://localhost:${port}`);
+  console.log(`Estoca backend listening on http://localhost:${port}`);
 });

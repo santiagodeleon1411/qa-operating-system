@@ -5,7 +5,7 @@
 // action it answers allow or deny, and nothing else. Two things worth stating up front:
 //
 //  - The unit of authorization for an adjustment is its REASON, not the bare action. An employee
-//    may record a shortfall, but only the owner may classify one as theft ("Robo o pérdida") —
+//    may record a shortfall, but only the owner may classify one as theft ("Theft or loss") —
 //    segregation of duties, so whoever moves the merchandise is not the one who writes off its
 //    disappearance.
 //  - This module is the policy; enforcement lives at the write edge (server/handlers.ts), and the
@@ -17,20 +17,20 @@ export type Role = (typeof ROLES)[number];
 /**
  * The closed set of reasons a physical-count adjustment may carry. Closed, not free text,
  * precisely because the reason is what authorization turns on: the vocabulary is owned by the
- * server, so "Robo o pérdida" is one exact, guardable value — not a string a caller can spell
- * their way around. "Faltante sin clasificar" is the neutral reason that lets an employee record
+ * server, so "Theft or loss" is one exact, guardable value — not a string a caller can spell
+ * their way around. "Unclassified shortfall" is the neutral reason that lets an employee record
  * a shortfall without asserting a cause (the maker-checker split from the spec).
  */
 export const ADJUSTMENT_REASONS = [
-  'Rotura',
-  'Error de carga',
-  'Faltante sin clasificar',
-  'Robo o pérdida',
+  'Breakage',
+  'Data entry error',
+  'Unclassified shortfall',
+  'Theft or loss',
 ] as const;
 export type AdjustmentReason = (typeof ADJUSTMENT_REASONS)[number];
 
 /** The owner-only classification: writing a shortfall off as an accounted-for loss. */
-export const OWNER_ONLY_ADJUSTMENT_REASON: AdjustmentReason = 'Robo o pérdida';
+export const OWNER_ONLY_ADJUSTMENT_REASON: AdjustmentReason = 'Theft or loss';
 
 /**
  * May this role record a movement of this kind? Owner and employee record both directions; the

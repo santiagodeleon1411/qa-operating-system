@@ -11,13 +11,13 @@ test('the shop is behind a login; wrong credentials are refused, right ones get 
   await estoca.open();
 
   // The login screen, not the shop.
-  await expect(page.getByRole('heading', { name: 'Iniciar sesión' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Stock actual' })).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Current stock' })).toBeHidden();
 
   // A wrong password is refused, and the shop stays out of reach.
-  await estoca.attemptLogin(LOGINS.ana.username, 'incorrecta');
-  await expect(estoca.loginError).toContainText('incorrectos');
-  await expect(page.getByRole('heading', { name: 'Stock actual' })).toBeHidden();
+  await estoca.attemptLogin(LOGINS.ana.username, 'wrong');
+  await expect(estoca.loginError).toContainText('Incorrect');
+  await expect(page.getByRole('heading', { name: 'Current stock' })).toBeHidden();
 
   // The right credentials reach the shop, shown as the logged-in user.
   await estoca.login(LOGINS.ana.username, LOGINS.ana.password);
