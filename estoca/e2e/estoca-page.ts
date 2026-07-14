@@ -76,6 +76,37 @@ export class EstocaPage {
     return this.row(productName).locator('td.stock');
   }
 
+  /** The status cell (last column) of a Product's row: the 'Low stock' badge or 'In stock' text. */
+  statusCell(productName: string): Locator {
+    return this.row(productName).locator('td').last();
+  }
+
+  /** The low-stock badge in a Product's row — present only when the server reports it below threshold. */
+  lowStockBadge(productName: string): Locator {
+    return this.row(productName).locator('.low-stock-badge');
+  }
+
+  /** The owner-only threshold input for a Product (absent for other roles). */
+  thresholdInput(productName: string): Locator {
+    return this.row(productName).locator('.thr-input');
+  }
+
+  /** Set a Product's low-stock threshold through the owner's inline control, then Save. */
+  async setThreshold(productName: string, value: number): Promise<void> {
+    await this.thresholdInput(productName).fill(String(value));
+    await this.row(productName).locator('.thr-save').click();
+  }
+
+  /** The status/error line under the stock table (owner-only; threshold validation surfaces here). */
+  get thresholdMessage(): Locator {
+    return this.page.locator('#threshold-msg');
+  }
+
+  /** The visible column headers of the stock table (the first table on the page). */
+  async stockHeaders(): Promise<string[]> {
+    return this.page.locator('table').first().locator('thead th').allInnerTexts();
+  }
+
   /** The Stock a Product currently shows: the baseline a test measures its change against. */
   async stockOf(productName: string): Promise<number> {
     return Number(await this.stockCell(productName).innerText());
