@@ -55,29 +55,23 @@ export function stockOf(productId: string, movements: readonly StockMovement[]):
 }
 
 /** A Product's effective low-stock threshold: its own, or the default when the owner set none. */
-export function effectiveThreshold(product: Product): number {
+export function effectiveThreshold(product: Pick<Product, 'threshold'>): number {
   return product.threshold ?? DEFAULT_THRESHOLD;
+}
+
+/**
+ * The low-stock rule itself, over an already-known Stock level: a Product is low when its Stock
+ * reaches or drops below its effective threshold. This is the single source both callers share —
+ * the read model (which derives Stock in SQL) and `isBelowThreshold` (which derives it from the
+ * ledger) — so the rule that ships is the rule the unit tests cover.
+ */
+export function isLowStock(stock: number, product: Pick<Product, 'threshold'>): boolean {
+  return stock <= effectiveThreshold(product);
 }
 
 /** A Product is low on Stock when its Stock reaches or drops below its effective threshold. */
 export function isBelowThreshold(product: Product, movements: readonly StockMovement[]): boolean {
-  return stockOf(product.id, movements) <= effectiveThreshold(product);
-}
-
-/**
- * Validate a threshold the owner is trying to set, rejecting the inputs that a low-stock
- * setting must never hold: a non-whole number, or one outside the closed sanity range. A
- * value that fails here is not stored — the threshold, like a movement, is refused before it
- * can reach the store. Returns the value unchanged when it is valid, for use at the boundary.
- */
-export function assertValidThreshold(value: number): number {
-  if (!Number.isInteger(value)) {
-    throw new Error('The threshold must be a whole number.');
-  }
-  if (value < THRESHOLD_MIN || value > THRESHOLD_MAX) {
-    throw new Error(`The threshold must be between ${THRESHOLD_MIN} and ${THRESHOLD_MAX}.`);
-  }
-  return value;
+  return isLowStock(stockOf(product.id, movements), product);
 }
 
 /**

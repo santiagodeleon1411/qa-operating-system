@@ -98,10 +98,22 @@ export class EstocaPage {
    * re-render landed would have its inputs wiped mid-interaction — the form would be replaced under
    * it and the submit would carry the fresh form's defaults instead. Waiting for the PATCH response
    * closes that race deterministically: the next Playwright command is a fresh round-trip to the
-   * browser, a macrotask boundary that flushes the synchronous re-render first. Resolves on any
-   * response, including a rejection (400/403), so the validation paths still return rather than hang.
+   * browser, a macrotask boundary that flushes the synchronous re-render first.
+   *
+   * PRECONDITION — `value` must be a whole number, the only kind the client SUBMITS. Empty or
+   * non-integer inputs are refused in the browser (onSaveThreshold, main.ts) and never fire a
+   * PATCH, so waiting on the response here would hang. Assert those client-side rejections through
+   * the input directly (fill → click `.thr-save` → read `thresholdMessage`), not through this
+   * helper. The guard below turns the misuse into an immediate, honest failure instead of a timeout.
+   * A server-side rejection (403/422) DOES respond, so the authorization and range paths resolve.
    */
   async setThreshold(productName: string, value: number): Promise<void> {
+    if (!Number.isInteger(value)) {
+      throw new Error(
+        `setThreshold expects a whole number; got ${value}. The client rejects non-integers ` +
+          `before any request, so no PATCH would fire — assert that case through the input directly.`,
+      );
+    }
     await this.thresholdInput(productName).fill(String(value));
     const saved = this.page.waitForResponse(
       (r) => r.request().method() === 'PATCH' && r.url().includes('/products'),

@@ -77,8 +77,11 @@ for (const role of [LOGINS.bruno, LOGINS.caro] as const) {
     await expect(page.locator('.thr-save')).toHaveCount(0);
 
     // ...but the low-stock signal itself is for everyone — it is the control, not the badge, that
-    // is owner-only. Sugar seeds at Stock 0 under a threshold of 10, so it is always below
-    // threshold: a badge renders for the non-owner too.
+    // is owner-only. Force Sugar below its threshold rather than trusting the seed: the in-memory
+    // DB accumulates state across tests, so an earlier test could have raised its Stock. Bringing
+    // it to 0 needs only an exit, which both non-owner roles may record, and 0 is below its
+    // threshold of 10 — so a badge must render for the non-owner too.
+    await estoca.setStockTo(PRODUCTS.azucar, 0);
     await expect(estoca.lowStockBadge(PRODUCTS.azucar)).toBeVisible();
   });
 }

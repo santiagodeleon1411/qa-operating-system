@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { DEFAULT_THRESHOLD } from '../domain';
+import { isLowStock } from '../domain';
 
 // Estoca — the Product read model and the owner-only threshold write. See docs/adr/0006–0008.
 //
@@ -41,7 +41,7 @@ export class ProductsRepo {
 
   /** Resolve the low-stock flag on read: Stock at or below the effective threshold. Never stored. */
   private toView(r: ProductRow): ProductView {
-    return { ...r, belowThreshold: r.stock <= (r.threshold ?? DEFAULT_THRESHOLD) };
+    return { ...r, belowThreshold: isLowStock(r.stock, r) };
   }
 
   /** The catalogue with each Product's derived Stock and low-stock flag — behind `GET /products`. */

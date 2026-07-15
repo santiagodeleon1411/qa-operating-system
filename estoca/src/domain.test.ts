@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   stockOf,
   isBelowThreshold,
+  isLowStock,
   effectiveThreshold,
-  assertValidThreshold,
   DEFAULT_THRESHOLD,
   makeMovement,
   wouldGoNegative,
@@ -72,19 +72,15 @@ describe('Low-stock alerting', () => {
     expect(isBelowThreshold(unset, [mov('p1', 'entry', DEFAULT_THRESHOLD)])).toBe(true);
     expect(isBelowThreshold(unset, [mov('p1', 'entry', DEFAULT_THRESHOLD + 1)])).toBe(false);
   });
-});
 
-describe('A threshold outside the settable range is refused', () => {
-  it('accepts a whole number within the closed range, including both bounds', () => {
-    expect(assertValidThreshold(0)).toBe(0);
-    expect(assertValidThreshold(10_000)).toBe(10_000);
-    expect(assertValidThreshold(7)).toBe(7);
-  });
-
-  it('rejects a negative, a decimal, and a value over the sanity cap', () => {
-    expect(() => assertValidThreshold(-1)).toThrow(); // below the floor
-    expect(() => assertValidThreshold(2.5)).toThrow(); // not a whole number
-    expect(() => assertValidThreshold(10_001)).toThrow(); // over the cap
+  // The rule over an already-known Stock level — the exact shape the read model ships
+  // (`products-repo` derives Stock in SQL, then asks the domain). Same boundary as
+  // `isBelowThreshold`: at or below fires, one above does not; unset falls back to the default.
+  it('decides low-stock over a derived Stock number, the way the read model does', () => {
+    expect(isLowStock(5, product)).toBe(true); // stock == threshold
+    expect(isLowStock(6, product)).toBe(false); // one above
+    expect(isLowStock(DEFAULT_THRESHOLD, { threshold: null })).toBe(true); // unset → default
+    expect(isLowStock(DEFAULT_THRESHOLD + 1, { threshold: null })).toBe(false);
   });
 });
 
