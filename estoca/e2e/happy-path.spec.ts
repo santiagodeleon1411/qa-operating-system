@@ -13,7 +13,7 @@ test('an entry raises the derived Stock by exactly the quantity recorded', async
     product: PRODUCTS.cafe,
     kind: 'entry',
     quantity: 7,
-    reason: 'Compra',
+    reason: 'Purchase',
   });
 
   // toHaveText auto-retries until the screen re-reads the truth from the backend — no sleeps.

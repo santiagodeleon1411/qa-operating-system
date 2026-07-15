@@ -3,26 +3,26 @@ import { hashPassword, verifyPassword, newSessionToken } from './auth';
 
 describe('password hashing', () => {
   it('verifies the correct password against its stored hash', () => {
-    const stored = hashPassword('contraseña-secreta');
-    expect(verifyPassword('contraseña-secreta', stored)).toBe(true);
+    const stored = hashPassword('secret-password');
+    expect(verifyPassword('secret-password', stored)).toBe(true);
   });
 
   it('rejects a wrong password', () => {
-    const stored = hashPassword('contraseña-secreta');
-    expect(verifyPassword('contraseña-equivocada', stored)).toBe(false);
+    const stored = hashPassword('secret-password');
+    expect(verifyPassword('wrong-password', stored)).toBe(false);
   });
 
   it('never stores the plaintext', () => {
-    const stored = hashPassword('contraseña-secreta');
-    expect(stored).not.toContain('contraseña-secreta');
+    const stored = hashPassword('secret-password');
+    expect(stored).not.toContain('secret-password');
   });
 
   it('salts: the same password hashes differently every time', () => {
-    expect(hashPassword('misma')).not.toBe(hashPassword('misma'));
+    expect(hashPassword('same')).not.toBe(hashPassword('same'));
   });
 
   it('rejects a malformed stored value instead of throwing', () => {
-    expect(verifyPassword('cualquiera', 'no-es-un-hash-valido')).toBe(false);
+    expect(verifyPassword('anything', 'not-a-valid-hash')).toBe(false);
   });
 });
 

@@ -12,14 +12,17 @@
 // ledger, and the actor stamped on a movement is the session's user, never the caller's claim.
 
 import type { MovementsRepo } from '../db/movements-repo';
+import type { ProductsRepo } from '../db/products-repo';
 import type { AuthRepo, SessionUser } from '../db/auth-repo';
-import { canRecordMovement, canRecordAdjustment } from '../authz';
+import { canRecordMovement, canRecordAdjustment, canSetThreshold } from '../authz';
 import { planAdjustment } from '../domain';
 import {
   movementInput,
   adjustmentInput,
+  setThresholdInput,
   credentials as credentialsSchema,
   productsResponse,
+  productView as productViewSchema,
   movementsResponse,
   movement as movementSchema,
   sessionUser as sessionUserSchema,
@@ -42,7 +45,7 @@ const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 const UNAUTHENTICATED: HandlerResult<ErrorResponse> = {
   status: 401,
-  body: { error: 'Tenés que iniciar sesión para continuar.' },
+  body: { error: 'You must sign in to continue.' },
 };
 
 // 403 is a different refusal from 401: the actor IS authenticated, but their role does not permit
@@ -50,12 +53,12 @@ const UNAUTHENTICATED: HandlerResult<ErrorResponse> = {
 // here, in the tested layer, not in the transport — and it stamps nothing on the ledger.
 const FORBIDDEN: HandlerResult<ErrorResponse> = {
   status: 403,
-  body: { error: 'Tu rol no tiene permiso para esta acción.' },
+  body: { error: 'Your role is not permitted to perform this action.' },
 };
 
 /** The first human-readable reason a payload failed the contract. */
 function firstIssue(error: { issues: ReadonlyArray<{ message: string }> }): string {
-  return error.issues[0]?.message ?? 'Solicitud inválida.';
+  return error.issues[0]?.message ?? 'Invalid request.';
 }
 
 // --- Identity -------------------------------------------------------------------------------
@@ -75,7 +78,7 @@ export function login(
   if (!parsed.success) return { status: 422, body: { error: firstIssue(parsed.error) } };
 
   const user = auth.authenticate(parsed.data.username, parsed.data.password);
-  if (!user) return { status: 401, body: { error: 'Usuario o contraseña incorrectos.' } };
+  if (!user) return { status: 401, body: { error: 'Incorrect username or password.' } };
 
   const expiresAt = new Date(new Date(now).getTime() + SESSION_TTL_MS).toISOString();
   const token = auth.createSession(user.id, expiresAt);
@@ -98,11 +101,35 @@ export function me(actor: SessionUser | null): HandlerResult<SessionUser | Error
 
 /** `GET /products` — the catalogue with each Product's derived Stock. Requires a session. */
 export function getProducts(
-  repo: MovementsRepo,
+  products: ProductsRepo,
   actor: SessionUser | null,
 ): HandlerResult<ProductView[] | ErrorResponse> {
   if (!actor) return UNAUTHENTICATED;
-  return { status: 200, body: productsResponse.parse(repo.listProductViews()) };
+  return { status: 200, body: productsResponse.parse(products.listProductViews()) };
+}
+
+/**
+ * `PATCH /products` — set a Product's low-stock threshold. Owner-only, and the guard turns on
+ * the role alone: a non-owner is refused (403) BEFORE the body is parsed, so nothing is stored
+ * and a forbidden caller cannot even probe the payload rules. A malformed or out-of-range
+ * threshold is then refused at the edge (422) with the domain's own message. The accepted change
+ * is stamped with the acting owner and recorded (attribution), and the updated Product view is
+ * returned so the screen can reflect the new low-stock state without a reload.
+ */
+export function setThreshold(
+  products: ProductsRepo,
+  actor: SessionUser | null,
+  rawBody: unknown,
+  now: string = new Date().toISOString(),
+): HandlerResult<ProductView | ErrorResponse> {
+  if (!actor) return UNAUTHENTICATED;
+  if (!canSetThreshold(actor.role)) return FORBIDDEN;
+  const parsed = setThresholdInput.safeParse(rawBody);
+  if (!parsed.success) return { status: 422, body: { error: firstIssue(parsed.error) } };
+
+  const updated = products.setThreshold(parsed.data.productId, parsed.data.threshold, actor.id, now);
+  if (!updated) return { status: 404, body: { error: 'That Product does not exist.' } };
+  return { status: 200, body: productViewSchema.parse(updated) };
 }
 
 /** `GET /movements` — the recent ledger, each movement carrying who recorded it. */
@@ -159,7 +186,7 @@ export function postAdjustment(
 
   const currentStock = repo.deriveStock(productId);
   if (!confirmed && currentStock !== expectedStock) {
-    return { status: 409, body: { error: 'El Stock cambió desde que empezó el conteo.', currentStock } };
+    return { status: 409, body: { error: 'Stock changed since the count began.', currentStock } };
   }
 
   try {

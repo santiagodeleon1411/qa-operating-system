@@ -26,15 +26,15 @@ test('a Stock change during the count forces a reconfirm, then the adjustment re
   });
   expect(auth.ok()).toBeTruthy();
   const resp = await request.post(`${API}/movements`, {
-    data: { productId: PRODUCT_IDS.yerba, kind: 'entry', quantity: 3, reason: 'Compra' },
+    data: { productId: PRODUCT_IDS.yerba, kind: 'entry', quantity: 3, reason: 'Purchase' },
   });
   expect(resp.ok()).toBeTruthy();
 
   // The Merchant submits their physical count. The backend sees the snapshot no longer matches
   // the real Stock and refuses, showing what the Stock is now (snapshot + 3).
   const counted = snapshot + 10;
-  await estoca.adjust({ product: PRODUCTS.yerba, counted, reason: 'Error de carga' });
-  await expect(estoca.adjustMessage).toContainText(`ahora hay ${snapshot + 3}`);
+  await estoca.adjust({ product: PRODUCTS.yerba, counted, reason: 'Data entry error' });
+  await expect(estoca.adjustMessage).toContainText(`there are now ${snapshot + 3}`);
   await expect(estoca.reconfirmButton).toBeVisible();
 
   // The Merchant reconfirms: the count is still valid. The difference is recorded from the

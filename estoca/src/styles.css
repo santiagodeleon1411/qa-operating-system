@@ -71,28 +71,58 @@ th {
   letter-spacing: 0.04em;
 }
 
+th.num,
+td.num {
+  text-align: right;
+}
+
 td.stock {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 1.1rem;
 }
 
-.badge {
-  display: inline-block;
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
+/* The owner-only threshold control: a compact number field with an explicit Save button, so the
+   commit is unambiguous (the interaction diverges from the mockup, which shows a bare field —
+   the mockup is the source of record for the badge tokens, not for this control's behaviour). */
+.thr-input {
+  width: 80px;
+  text-align: right;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  /* Extra right padding reserves a gutter for the native number spinner, so the value no longer
+     collides with the up/down arrows — the field stays comfortable to nudge (manual TC-26). */
+  padding: 0.35rem 1.5rem 0.35rem 0.5rem;
+}
+
+.thr-save {
+  margin: 0 0 0 0.4rem;
+  padding: 0.35rem 0.7rem;
   font-size: 0.8rem;
+  vertical-align: middle;
+}
+
+/* The low-stock badge. These seven declarations are the design source of record (the mockup
+   at docs/mockups/21-low-stock-threshold/badge.html); the design test asserts the badge's
+   computed style equals them exactly (Route B, TC-23/24), so they are absolute values, not
+   theme tokens — a red island of color that reads the same on the dark shell. */
+.low-stock-badge {
+  background-color: #b4231f;
+  color: #ffffff;
+  font-size: 12px;
   font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.02em;
+  display: inline-block;
+  line-height: 1.4;
 }
 
-.badge-ok {
-  background: rgba(55, 196, 107, 0.15);
-  color: var(--ok);
-}
-
-.badge-out {
-  background: rgba(255, 93, 93, 0.15);
-  color: var(--out);
+/* The in-stock state is deliberately quiet — muted text, not a badge — so only the low-stock
+   warning draws the eye. */
+.status-ok {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .note {

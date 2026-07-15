@@ -11,15 +11,6 @@ export interface MovementInput {
   at: string;
 }
 
-/** A Product with its Stock derived from the ledger. `stock`/`stockout` are never stored. */
-export interface ProductView {
-  id: string;
-  name: string;
-  threshold: number;
-  stock: number;
-  stockout: boolean;
-}
-
 /** A recorded movement as read back from the ledger, carrying who recorded it. */
 export interface RecordedMovement extends StockMovement {
   actorId: string;
@@ -39,23 +30,6 @@ export class MovementsRepo {
       .prepare('SELECT stock FROM product_stock WHERE product_id = ?')
       .get(productId) as { stock: number } | undefined;
     return row?.stock ?? 0;
-  }
-
-  /**
-   * The catalogue with each Product's Stock, derived by the DB view — the read model behind
-   * `GET /products`. Stockout follows the domain rule (Stock at or below the threshold);
-   * it is computed here, never stored.
-   */
-  listProductViews(): ProductView[] {
-    const rows = this.db
-      .prepare(
-        `SELECT p.id, p.name, p.threshold, ps.stock
-           FROM products p
-           JOIN product_stock ps ON ps.product_id = p.id
-          ORDER BY p.name`,
-      )
-      .all() as Array<{ id: string; name: string; threshold: number; stock: number }>;
-    return rows.map((r) => ({ ...r, stockout: r.stock <= r.threshold }));
   }
 
   /**

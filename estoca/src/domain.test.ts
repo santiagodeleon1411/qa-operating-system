@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   stockOf,
-  isStockout,
+  isBelowThreshold,
+  isLowStock,
+  effectiveThreshold,
+  DEFAULT_THRESHOLD,
   makeMovement,
   wouldGoNegative,
   planAdjustment,
@@ -49,16 +52,35 @@ describe('Stock is derived, never stored — "the Stock never lies"', () => {
   });
 });
 
-describe('Stockout alerting', () => {
-  const product: Product = { id: 'p1', name: 'Café', threshold: 5 };
+describe('Low-stock alerting', () => {
+  const product: Product = { id: 'p1', name: 'Coffee', threshold: 5 };
 
   it('does not fire above the threshold', () => {
-    expect(isStockout(product, [mov('p1', 'entry', 6)])).toBe(false);
+    expect(isBelowThreshold(product, [mov('p1', 'entry', 6)])).toBe(false);
   });
 
   it('fires at or below the threshold', () => {
-    expect(isStockout(product, [mov('p1', 'entry', 5)])).toBe(true);
-    expect(isStockout(product, [mov('p1', 'entry', 3)])).toBe(true);
+    expect(isBelowThreshold(product, [mov('p1', 'entry', 5)])).toBe(true);
+    expect(isBelowThreshold(product, [mov('p1', 'entry', 3)])).toBe(true);
+  });
+
+  // BE4: a Product with no threshold set falls back to the default — and the default fails
+  // toward the alert (Ana's rule), so an unset Product at Stock 5 warns, at Stock 6 does not.
+  it('falls back to the default threshold when the owner set none', () => {
+    const unset: Product = { id: 'p1', name: 'New', threshold: null };
+    expect(effectiveThreshold(unset)).toBe(DEFAULT_THRESHOLD);
+    expect(isBelowThreshold(unset, [mov('p1', 'entry', DEFAULT_THRESHOLD)])).toBe(true);
+    expect(isBelowThreshold(unset, [mov('p1', 'entry', DEFAULT_THRESHOLD + 1)])).toBe(false);
+  });
+
+  // The rule over an already-known Stock level — the exact shape the read model ships
+  // (`products-repo` derives Stock in SQL, then asks the domain). Same boundary as
+  // `isBelowThreshold`: at or below fires, one above does not; unset falls back to the default.
+  it('decides low-stock over a derived Stock number, the way the read model does', () => {
+    expect(isLowStock(5, product)).toBe(true); // stock == threshold
+    expect(isLowStock(6, product)).toBe(false); // one above
+    expect(isLowStock(DEFAULT_THRESHOLD, { threshold: null })).toBe(true); // unset → default
+    expect(isLowStock(DEFAULT_THRESHOLD + 1, { threshold: null })).toBe(false);
   });
 });
 
@@ -82,7 +104,7 @@ describe('A movement that would make the Stock lie is rejected', () => {
 
 describe('A physical count becomes an adjustment movement, never a stored Stock', () => {
   const adjust = (counted: number, snapshotStock: number) =>
-    planAdjustment({ productId: 'p1', counted, snapshotStock, reason: 'conteo', at });
+    planAdjustment({ productId: 'p1', counted, snapshotStock, reason: 'count', at });
 
   it('records the difference as an exit when the count is below the system', () => {
     const m = adjust(39, 42)!;
@@ -112,7 +134,7 @@ describe('A physical count becomes an adjustment movement, never a stored Stock'
   });
 
   it('refuses a negative or non-whole count', () => {
-    expect(() => adjust(-3, 42)).toThrow('negativo');
-    expect(() => adjust(3.5, 42)).toThrow('enteros');
+    expect(() => adjust(-3, 42)).toThrow('negative');
+    expect(() => adjust(3.5, 42)).toThrow('whole');
   });
 });

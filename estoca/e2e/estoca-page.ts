@@ -4,9 +4,9 @@ import { type Page, type Locator } from '@playwright/test';
 // over the API), so a test picks one of these three to work with. Full names, because the
 // screen renders them verbatim and we match rows by their visible text.
 export const PRODUCTS = {
-  cafe: 'Café molido 500g',
+  cafe: 'Ground coffee 500g',
   yerba: 'Yerba mate 1kg',
-  azucar: 'Azúcar 1kg',
+  azucar: 'Sugar 1kg',
 } as const;
 
 // The backend ids for those Products, needed when a test reaches PAST the screen to the API
@@ -27,7 +27,7 @@ export const LOGINS = {
 } as const;
 
 // A Page Object: the ONE place that knows how Estoca's screen is built. Tests speak in terms
-// of "log in", "record a movement" or "the Stock of the café"; only this class knows which
+// of "log in", "record a movement" or "the Stock of the coffee"; only this class knows which
 // selectors and form fields make that happen. When the UI changes, this file changes.
 export class EstocaPage {
   constructor(private readonly page: Page) {}
@@ -43,13 +43,13 @@ export class EstocaPage {
     const form = this.page.locator('#login-form');
     await form.locator('input[name=username]').fill(username);
     await form.locator('input[name=password]').fill(password);
-    await form.getByRole('button', { name: 'Entrar' }).click();
+    await form.getByRole('button', { name: 'Sign in' }).click();
   }
 
   /** Log in and wait until the shop is shown — what most tests do first. */
   async login(username: string, password: string): Promise<void> {
     await this.attemptLogin(username, password);
-    await this.page.getByRole('heading', { name: 'Stock actual' }).waitFor();
+    await this.page.getByRole('heading', { name: 'Current stock' }).waitFor();
   }
 
   /** The error line on the login form. */
@@ -57,13 +57,13 @@ export class EstocaPage {
     return this.page.locator('#login-error');
   }
 
-  /** The "Conectado como …" line in the top bar. */
+  /** The "Signed in as …" line in the top bar. */
   get connectedAs(): Locator {
     return this.page.locator('.topbar');
   }
 
   async logout(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Salir' }).click();
+    await this.page.getByRole('button', { name: 'Sign out' }).click();
   }
 
   /** The table row for a Product, located by its visible name. */
@@ -76,12 +76,68 @@ export class EstocaPage {
     return this.row(productName).locator('td.stock');
   }
 
+  /** The status cell (last column) of a Product's row: the 'Low stock' badge or 'In stock' text. */
+  statusCell(productName: string): Locator {
+    return this.row(productName).locator('td').last();
+  }
+
+  /** The low-stock badge in a Product's row — present only when the server reports it below threshold. */
+  lowStockBadge(productName: string): Locator {
+    return this.row(productName).locator('.low-stock-badge');
+  }
+
+  /** The owner-only threshold input for a Product (absent for other roles). */
+  thresholdInput(productName: string): Locator {
+    return this.row(productName).locator('.thr-input');
+  }
+
+  /**
+   * Set a Product's low-stock threshold through the owner's inline control, then Save — and wait
+   * for the save to COMPLETE before returning. Saving fires an in-place re-render (onSaveThreshold
+   * rebuilds the whole screen from the server's response); a caller that touched a form before that
+   * re-render landed would have its inputs wiped mid-interaction — the form would be replaced under
+   * it and the submit would carry the fresh form's defaults instead. Waiting for the PATCH response
+   * closes that race deterministically: the next Playwright command is a fresh round-trip to the
+   * browser, a macrotask boundary that flushes the synchronous re-render first.
+   *
+   * PRECONDITION — `value` must be a whole number, the only kind the client SUBMITS. Empty or
+   * non-integer inputs are refused in the browser (onSaveThreshold, main.ts) and never fire a
+   * PATCH, so waiting on the response here would hang. Assert those client-side rejections through
+   * the input directly (fill → click `.thr-save` → read `thresholdMessage`), not through this
+   * helper. The guard below turns the misuse into an immediate, honest failure instead of a timeout.
+   * A server-side rejection (403/422) DOES respond, so the authorization and range paths resolve.
+   */
+  async setThreshold(productName: string, value: number): Promise<void> {
+    if (!Number.isInteger(value)) {
+      throw new Error(
+        `setThreshold expects a whole number; got ${value}. The client rejects non-integers ` +
+          `before any request, so no PATCH would fire — assert that case through the input directly.`,
+      );
+    }
+    await this.thresholdInput(productName).fill(String(value));
+    const saved = this.page.waitForResponse(
+      (r) => r.request().method() === 'PATCH' && r.url().includes('/products'),
+    );
+    await this.row(productName).locator('.thr-save').click();
+    await saved;
+  }
+
+  /** The status/error line under the stock table (owner-only; threshold validation surfaces here). */
+  get thresholdMessage(): Locator {
+    return this.page.locator('#threshold-msg');
+  }
+
+  /** The visible column headers of the stock table (the first table on the page). */
+  async stockHeaders(): Promise<string[]> {
+    return this.page.locator('table').first().locator('thead th').allInnerTexts();
+  }
+
   /** The Stock a Product currently shows: the baseline a test measures its change against. */
   async stockOf(productName: string): Promise<number> {
     return Number(await this.stockCell(productName).innerText());
   }
 
-  /** Record a movement through the "Registrar movimiento" form, as the Merchant would. */
+  /** Record a movement through the "Record movement" form, as the Merchant would. */
   async recordMovement(opts: {
     product: string;
     kind: 'entry' | 'exit';
@@ -93,7 +149,7 @@ export class EstocaPage {
     await form.locator('select[name=kind]').selectOption(opts.kind);
     await form.locator('input[name=quantity]').fill(String(opts.quantity));
     await form.locator('input[name=reason]').fill(opts.reason);
-    await form.getByRole('button', { name: 'Registrar' }).click();
+    await form.getByRole('button', { name: 'Record' }).click();
   }
 
   /** The inline error line under the movement form (empty when there is no error). */
@@ -101,13 +157,38 @@ export class EstocaPage {
     return this.page.locator('#error');
   }
 
-  /** Reconcile a Product to a physical count through the "Ajustar por conteo físico" form. */
+  /**
+   * Bring a Product's Stock to an EXACT value, the way the app allows it: never by writing Stock
+   * (there is no such control — Stock is derived), but by recording the one movement that closes
+   * the gap. Reads the current Stock, then records an entry or an exit for the difference.
+   *
+   * Recording a movement kicks off a full re-load of the shop (renderLoading → renderApp), so
+   * this waits until the NEW Stock is actually on screen before returning — a deterministic state
+   * signal, not a timer. A caller that acted on the row before the re-load settled would be
+   * racing the re-render; waiting on the rendered value removes the race at the source.
+   */
+  async setStockTo(productName: string, target: number): Promise<void> {
+    const currentStock = await this.stockOf(productName);
+    if (currentStock === target) return; // already there — nothing to record
+    await this.recordMovement({
+      product: productName,
+      kind: currentStock < target ? 'entry' : 'exit',
+      quantity: Math.abs(target - currentStock),
+      reason: 'baseline for a low-stock test',
+    });
+    // The Stock cell now carries exactly `target`. Match it whole (^N$) so 1 does not match 11.
+    await this.row(productName)
+      .locator('td.stock', { hasText: new RegExp(`^${target}$`) })
+      .waitFor();
+  }
+
+  /** Reconcile a Product to a physical count through the "Adjust by physical count" form. */
   async adjust(opts: { product: string; counted: number; reason: string }): Promise<void> {
     const form = this.page.locator('#adjust-form');
     await form.locator('select[name=productId]').selectOption({ label: opts.product });
     await form.locator('input[name=counted]').fill(String(opts.counted));
     await form.locator('select[name=reason]').selectOption(opts.reason);
-    await form.getByRole('button', { name: 'Registrar ajuste' }).click();
+    await form.getByRole('button', { name: 'Record adjustment' }).click();
   }
 
   /** The status line under the adjust form (staleness prompts and outcomes appear here). */
@@ -115,9 +196,9 @@ export class EstocaPage {
     return this.page.locator('#adjust-msg');
   }
 
-  /** The "Confirmar mi conteo" button shown only when the Stock changed during the count. */
+  /** The "Confirm my count" button shown only when the Stock changed during the count. */
   get reconfirmButton(): Locator {
-    return this.page.getByRole('button', { name: 'Confirmar mi conteo' });
+    return this.page.getByRole('button', { name: 'Confirm my count' });
   }
 
   /** The most recent row of the movement history — where attribution becomes visible. */
@@ -132,6 +213,6 @@ export class EstocaPage {
 
   /** The retry button offered by the unavailable state. */
   get retryButton(): Locator {
-    return this.page.getByRole('button', { name: 'Reintentar' });
+    return this.page.getByRole('button', { name: 'Retry' });
   }
 }

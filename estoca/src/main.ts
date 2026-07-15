@@ -7,9 +7,11 @@ import {
   fetchMovements,
   recordMovement,
   recordAdjustment,
+  setThreshold,
   MovementRefused,
   NotAuthenticated,
   Forbidden,
+  ThresholdRefused,
 } from './api/client';
 import type { ProductView, Movement, SessionUser } from './contract';
 import type { AdjustmentReason } from './authz';
@@ -24,6 +26,10 @@ let user: SessionUser | null = null;
 // The Stock each Product showed when the screen loaded — the snapshot a physical count is
 // measured against (docs/specs/stock-count-adjustment.md).
 let current: ProductView[] = [];
+
+// The movements last rendered on screen, kept so a threshold change can re-render the table
+// from memory — using the server's returned view — without re-fetching the whole shop (TC-22).
+let currentMovements: Movement[] = [];
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -42,24 +48,24 @@ function header(): string {
   return `
     <header>
       <h1>Estoca</h1>
-      <p class="tagline">Control de stock en tiempo real — el stock nunca miente.</p>
+      <p class="tagline">Real-time stock control — stock never lies.</p>
     </header>`;
 }
 
 function renderLoading(): void {
-  app.innerHTML = `${header()}<section class="panel"><p class="note">Cargando…</p></section>`;
+  app.innerHTML = `${header()}<section class="panel"><p class="note">Loading…</p></section>`;
 }
 
 function renderUnavailable(): void {
   app.innerHTML = `${header()}
     <section class="panel">
       <p class="error" role="alert">
-        No pudimos cargar tu stock en este momento. Suele ser un problema temporal de
-        conexión — <strong>tus datos están guardados, no se perdió nada.</strong>
-        Revisá tu conexión a internet y reintentá en unos segundos. Si el problema sigue,
-        escribinos a soporte.
+        We could not load your stock right now. This is usually a temporary connection
+        problem — <strong>your data is saved, nothing was lost.</strong>
+        Check your internet connection and try again in a few seconds. If the problem
+        persists, contact support.
       </p>
-      <button id="retry" type="button">Reintentar</button>
+      <button id="retry" type="button">Retry</button>
     </section>`;
   document.querySelector<HTMLButtonElement>('#retry')!.addEventListener('click', boot);
 }
@@ -67,15 +73,15 @@ function renderUnavailable(): void {
 function renderLogin(message = ''): void {
   app.innerHTML = `${header()}
     <section class="panel">
-      <h2>Iniciar sesión</h2>
+      <h2>Sign in</h2>
       <form id="login-form">
-        <label>Usuario
+        <label>Username
           <input name="username" type="text" autocomplete="username" />
         </label>
-        <label>Contraseña
+        <label>Password
           <input name="password" type="password" autocomplete="current-password" />
         </label>
-        <button type="submit">Entrar</button>
+        <button type="submit">Sign in</button>
       </form>
       <p id="login-error" class="error" role="alert">${esc(message)}</p>
     </section>`;
@@ -94,8 +100,8 @@ async function onLogin(e: SubmitEvent): Promise<void> {
   } catch (err) {
     renderLogin(
       err instanceof NotAuthenticated
-        ? 'Usuario o contraseña incorrectos.'
-        : 'No pudimos iniciar sesión. Revisá tu conexión y probá de nuevo.',
+        ? 'Incorrect username or password.'
+        : 'We could not sign you in. Check your connection and try again.',
     );
   }
 }
@@ -108,6 +114,7 @@ async function onLogout(): Promise<void> {
 
 function renderApp(products: ProductView[], movements: Movement[]): void {
   current = products; // the snapshot a physical count will be measured against
+  currentMovements = movements; // retained so a threshold save can re-render without a re-fetch
 
   // The UI reflects the actor's role (docs/specs/authorization-role-model.md). This is a
   // courtesy — hiding a control the role may not use — NOT the guarantee: authorization is
@@ -116,39 +123,40 @@ function renderApp(products: ProductView[], movements: Movement[]): void {
   const canEntry = role === 'owner' || role === 'employee'; // the runner records exits only
   const canAdjust = role === 'owner' || role === 'employee'; // the runner records no adjustments
   const canClassifyTheft = role === 'owner'; // theft-or-loss is the owner's alone
-  const roleLabel = { owner: 'Dueña', employee: 'Empleado', runner: 'Cadete' }[role];
+  const isOwner = role === 'owner'; // only the owner may set a Product's low-stock threshold
+  const roleLabel = { owner: 'Owner', employee: 'Employee', runner: 'Runner' }[role];
 
   const productOptions = products
     .map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`)
     .join('');
 
   // The adjustment panel, shown only to roles that may adjust. The theft-or-loss reason is
-  // offered only to the owner; everyone who can adjust gets the neutral "Faltante sin clasificar".
+  // offered only to the owner; everyone who can adjust gets the neutral "Unclassified shortfall".
   const adjustPanel = canAdjust
     ? `
     <section class="panel">
-      <h2>Ajustar por conteo físico</h2>
+      <h2>Adjust by physical count</h2>
       <form id="adjust-form">
         <label>Product
           <select name="productId">${productOptions}</select>
         </label>
-        <label>Contaste
+        <label>You counted
           <input name="counted" type="number" min="0" step="1" value="0" />
         </label>
-        <label>Motivo de la diferencia
+        <label>Reason for the difference
           <select name="reason">
-            <option value="" disabled selected>Elegí un motivo…</option>
-            <option value="Rotura">Rotura</option>
-            <option value="Error de carga">Error de carga</option>
-            <option value="Faltante sin clasificar">Faltante sin clasificar</option>
-            ${canClassifyTheft ? '<option value="Robo o pérdida">Robo o pérdida</option>' : ''}
+            <option value="" disabled selected>Choose a reason…</option>
+            <option value="Breakage">Breakage</option>
+            <option value="Data entry error">Data entry error</option>
+            <option value="Unclassified shortfall">Unclassified shortfall</option>
+            ${canClassifyTheft ? '<option value="Theft or loss">Theft or loss</option>' : ''}
           </select>
         </label>
-        <button type="submit">Registrar ajuste</button>
+        <button type="submit">Record adjustment</button>
       </form>
       <p class="note">
-        Ingresá el número real que contaste. El sistema registra la diferencia como un
-        movimiento — nunca reescribe el Stock a mano.
+        Enter the actual number you counted. The system records the difference as a
+        movement — it never rewrites Stock by hand.
       </p>
       <p id="adjust-msg" class="error" role="status"></p>
     </section>`
@@ -156,56 +164,76 @@ function renderApp(products: ProductView[], movements: Movement[]): void {
 
   app.innerHTML = `${header()}
     <section class="panel topbar">
-      <span class="note">Conectado como <strong>${esc(user?.name ?? '')}</strong> · ${esc(roleLabel)}</span>
-      <button id="logout" type="button">Salir</button>
+      <span class="note">Signed in as <strong>${esc(user?.name ?? '')}</strong> · ${esc(roleLabel)}</span>
+      <button id="logout" type="button">Sign out</button>
     </section>
 
     <section class="panel">
-      <h2>Stock actual</h2>
+      <h2>Current stock</h2>
       <table>
-        <thead><tr><th>Product</th><th>Stock</th><th>Estado</th></tr></thead>
+        <thead><tr>
+          <th>Product</th>
+          <th class="num">Stock</th>
+          ${isOwner ? '<th class="num">Threshold</th>' : ''}
+          <th>Status</th>
+        </tr></thead>
         <tbody>
           ${products
             .map((p) => {
-              const badge = p.stockout
-                ? '<span class="badge badge-out">Stockout</span>'
-                : '<span class="badge badge-ok">OK</span>';
+              // The screen reflects the server's low-stock decision as given; it never recomputes
+              // it from stock and threshold, so there is one source of that decision (TC-18/19).
+              const badge = p.belowThreshold
+                ? '<span class="low-stock-badge">Low stock</span>'
+                : '<span class="status-ok">In stock</span>';
+              // The threshold control belongs to the owner alone (TC-20/21); the column is absent
+              // for other roles. An unset threshold shows empty with a placeholder — it resolves
+              // to the default server-side, so the field is not pre-filled with a value nobody set.
+              const thresholdCell = isOwner
+                ? `<td class="num">
+                     <input class="thr-input" type="number" min="0" step="1"
+                       value="${p.threshold ?? ''}" placeholder="—"
+                       data-product="${esc(p.id)}" aria-label="${esc(p.name)} threshold" />
+                     <button type="button" class="thr-save" data-product="${esc(p.id)}">Save</button>
+                   </td>`
+                : '';
               return `<tr>
                 <td>${esc(p.name)}</td>
-                <td class="stock">${p.stock}</td>
+                <td class="stock num">${p.stock}</td>
+                ${thresholdCell}
                 <td>${badge}</td>
               </tr>`;
             })
             .join('')}
         </tbody>
       </table>
+      ${isOwner ? '<p id="threshold-msg" class="error" role="status"></p>' : ''}
       <p class="note">
-        No existe forma de editar el Stock directamente. Solo se registra un movimiento
-        — el Stock se deriva de la suma de los movimientos, en el backend.
+        There is no way to edit Stock directly. You only record a movement
+        — Stock is derived from the sum of movements, in the backend.
       </p>
     </section>
 
     <section class="panel">
-      <h2>Registrar movimiento</h2>
+      <h2>Record movement</h2>
       <form id="movement-form">
         <label>Product
           <select name="productId">
             ${products.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}
           </select>
         </label>
-        <label>Tipo
+        <label>Type
           <select name="kind">
-            ${canEntry ? '<option value="entry">Entrada (+)</option>' : ''}
-            <option value="exit">Salida (−)</option>
+            ${canEntry ? '<option value="entry">Entry (+)</option>' : ''}
+            <option value="exit">Exit (−)</option>
           </select>
         </label>
-        <label>Cantidad
+        <label>Quantity
           <input name="quantity" type="number" min="1" step="1" value="1" />
         </label>
-        <label>Motivo
-          <input name="reason" type="text" placeholder="Venta, compra, ajuste…" />
+        <label>Reason
+          <input name="reason" type="text" placeholder="Sale, purchase, adjustment…" />
         </label>
-        <button type="submit">Registrar</button>
+        <button type="submit">Record</button>
       </form>
       <p id="error" class="error" role="alert"></p>
     </section>
@@ -213,11 +241,11 @@ function renderApp(products: ProductView[], movements: Movement[]): void {
     ${adjustPanel}
 
     <section class="panel">
-      <h2>Historial de movimientos</h2>
+      <h2>Movement history</h2>
       <table>
-        <thead><tr><th>Cuándo</th><th>Product</th><th>Movimiento</th><th>Motivo</th><th>Quién</th></tr></thead>
+        <thead><tr><th>When</th><th>Product</th><th>Movement</th><th>Reason</th><th>Who</th></tr></thead>
         <tbody id="history">
-          ${movements.length === 0 ? '<tr><td colspan="5" class="note">Todavía no hay movimientos.</td></tr>' : ''}
+          ${movements.length === 0 ? '<tr><td colspan="5" class="note">No movements yet.</td></tr>' : ''}
           ${movements
             .map((m) => {
               const name = products.find((p) => p.id === m.productId)?.name ?? m.productId;
@@ -239,6 +267,10 @@ function renderApp(products: ProductView[], movements: Movement[]): void {
   document.querySelector<HTMLFormElement>('#movement-form')!.addEventListener('submit', onSubmit);
   // The adjust form is absent for roles that may not adjust (the runner); wire it only if shown.
   document.querySelector<HTMLFormElement>('#adjust-form')?.addEventListener('submit', onAdjust);
+  // The threshold Save buttons exist only in the owner's render; wire whichever are present.
+  document
+    .querySelectorAll<HTMLButtonElement>('.thr-save')
+    .forEach((btn) => btn.addEventListener('click', onSaveThreshold));
 }
 
 async function onSubmit(e: SubmitEvent): Promise<void> {
@@ -257,13 +289,13 @@ async function onSubmit(e: SubmitEvent): Promise<void> {
     });
     await loadApp(); // re-read the truth from the backend
   } catch (err) {
-    if (err instanceof NotAuthenticated) return renderLogin('Tu sesión expiró. Iniciá sesión de nuevo.');
+    if (err instanceof NotAuthenticated) return renderLogin('Your session expired. Sign in again.');
     // A refused movement (domain/invariant) or a forbidden one (role) carries the backend's
     // reason; anything else is a transport failure.
     errorEl.textContent =
       err instanceof MovementRefused || err instanceof Forbidden
         ? err.message
-        : 'No pudimos registrar el movimiento. Revisá tu conexión y probá de nuevo — no se guardó nada, así que podés reintentar sin duplicar.';
+        : 'We could not record the movement. Check your connection and try again — nothing was saved, so you can retry without duplicating.';
   }
 }
 
@@ -299,23 +331,57 @@ async function submitAdjustment(input: CountInput, confirmed: boolean): Promise<
     const outcome = await recordAdjustment({ ...input, confirmed });
     if (outcome.kind === 'recorded') return void (await loadApp()); // re-read the truth
     if (outcome.kind === 'unchanged') {
-      msg.textContent = 'El conteo coincide con el sistema. No hay ajuste que registrar.';
+      msg.textContent = 'The count matches the system. There is no adjustment to record.';
       return;
     }
     // Stock changed during the count: keep the original count, let the Merchant reconfirm.
     msg.innerHTML =
-      `El Stock cambió desde que empezaste el conteo (ahora hay ${outcome.currentStock}). ` +
-      `Si tu conteo sigue siendo válido, confirmalo. ` +
-      `<button id="confirm-count" type="button">Confirmar mi conteo</button>`;
+      `Stock changed since you started the count (there are now ${outcome.currentStock}). ` +
+      `If your count is still valid, confirm it. ` +
+      `<button id="confirm-count" type="button">Confirm my count</button>`;
     document
       .querySelector<HTMLButtonElement>('#confirm-count')!
       .addEventListener('click', () => void submitAdjustment(input, true));
   } catch (err) {
-    if (err instanceof NotAuthenticated) return renderLogin('Tu sesión expiró. Iniciá sesión de nuevo.');
+    if (err instanceof NotAuthenticated) return renderLogin('Your session expired. Sign in again.');
     msg.textContent =
       err instanceof MovementRefused || err instanceof Forbidden
         ? err.message
-        : 'No pudimos registrar el ajuste. Revisá tu conexión y probá de nuevo.';
+        : 'We could not record the adjustment. Check your connection and try again.';
+  }
+}
+
+/**
+ * The owner sets a Product's low-stock threshold. The server returns the updated Product view;
+ * the row re-renders from that response — no reload, no re-fetch — so the low-stock decision
+ * still comes from one place, the server (TC-22). An empty or non-integer value is refused before
+ * the request; a value the backend rejects (out of range) carries the backend's own message.
+ */
+async function onSaveThreshold(e: Event): Promise<void> {
+  const productId = (e.currentTarget as HTMLButtonElement).dataset.product!;
+  const input = document.querySelector<HTMLInputElement>(
+    `.thr-input[data-product="${CSS.escape(productId)}"]`,
+  )!;
+  const msg = document.querySelector<HTMLParagraphElement>('#threshold-msg')!;
+  msg.textContent = '';
+
+  const raw = input.value.trim();
+  if (raw === '' || !Number.isInteger(Number(raw))) {
+    msg.textContent = 'Enter a whole number to set the threshold.';
+    return;
+  }
+
+  try {
+    const updated = await setThreshold({ productId, threshold: Number(raw) });
+    // Replace the row from the server's view and re-render from memory — no re-fetch.
+    current = current.map((p) => (p.id === updated.id ? updated : p));
+    renderApp(current, currentMovements);
+  } catch (err) {
+    if (err instanceof NotAuthenticated) return renderLogin('Your session expired. Sign in again.');
+    msg.textContent =
+      err instanceof ThresholdRefused || err instanceof Forbidden
+        ? err.message
+        : 'We could not save the threshold. Check your connection and try again.';
   }
 }
 

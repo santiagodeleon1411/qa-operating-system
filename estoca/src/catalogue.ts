@@ -9,7 +9,7 @@ import type { Product } from './domain';
 // contract instead of deriving it locally.
 
 export const PRODUCTS: Product[] = [
-  { id: 'p-cafe', name: 'Café molido 500g', threshold: 5 },
+  { id: 'p-cafe', name: 'Ground coffee 500g', threshold: 5 },
   { id: 'p-yerba', name: 'Yerba mate 1kg', threshold: 8 },
-  { id: 'p-azucar', name: 'Azúcar 1kg', threshold: 10 },
+  { id: 'p-azucar', name: 'Sugar 1kg', threshold: 10 },
 ];

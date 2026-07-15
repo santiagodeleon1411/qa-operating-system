@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Estoca — Low-stock threshold (Task #21) — design mockup</title>
+<style>
+  :root {
+    --ink: #1a1d21;
+    --ink-soft: #5b6470;
+    --line: #e4e7eb;
+    --surface: #ffffff;
+    --page: #f5f6f8;
+    --accent: #1f6f5c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 40px 32px;
+  }
+  .frame {
+    max-width: 880px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.06);
+  }
+  header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: var(--accent); color: #fff;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 14px;
+  }
+  .brand .name { font-weight: 650; font-size: 15px; letter-spacing: -.01em; }
+  .role {
+    font-size: 12px; color: var(--ink-soft);
+    background: #eef1f4; border: 1px solid var(--line);
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .section-title {
+    padding: 20px 24px 4px;
+    font-size: 13px; font-weight: 650; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; font-size: 12px; font-weight: 600; color: var(--ink-soft);
+    padding: 10px 24px; border-bottom: 1px solid var(--line);
+  }
+  thead th.num, tbody td.num { text-align: right; }
+  tbody td {
+    padding: 14px 24px; border-bottom: 1px solid var(--line);
+    font-size: 14px; vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  .product { font-weight: 600; }
+  .muted { color: var(--ink-soft); font-size: 13px; }
+  .stock { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  /* Owner-only threshold control (FE2) */
+  .thr-input {
+    width: 64px; text-align: right;
+    font: inherit; font-variant-numeric: tabular-nums;
+    padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; color: var(--ink);
+  }
+
+  /* ── Badge under test — computed style must equal Task #23 design tokens ── */
+  .low-stock-badge {
+    background-color: #B4231F;
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.02em;
+    display: inline-block;
+    line-height: 1.4;
+  }
+
+  .status-ok { color: var(--ink-soft); font-size: 13px; }
+
+  .tokens {
+    margin: 22px auto 0;
+    max-width: 880px;
+  }
+  .tokens h2 {
+    font-size: 13px; font-weight: 650; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px;
+  }
+  .token-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+  }
+  .token {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .token .k { font-size: 11px; color: var(--ink-soft); }
+  .token .v {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px; font-weight: 600; margin-top: 3px;
+  }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: baseline; margin-right: 5px; border: 1px solid rgba(0,0,0,.1); }
+  .caption { max-width: 880px; margin: 14px auto 0; font-size: 12px; color: var(--ink-soft); line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <header>
+      <div class="brand">
+        <div class="mark">E</div>
+        <div class="name">Estoca · Inventory</div>
+      </div>
+      <div class="role">Signed in as Ana · Owner</div>
+    </header>
+
+    <div class="section-title">Products</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th class="num">Stock</th>
+          <th class="num">Threshold</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="product">Café<div class="muted">Fast mover</div></td>
+          <td class="num stock">8</td>
+          <td class="num"><input class="thr-input" value="10" aria-label="Café threshold" /></td>
+          <td><span class="low-stock-badge">Low stock</span></td>
+        </tr>
+        <tr>
+          <td class="product">Azúcar<div class="muted">Slow mover</div></td>
+          <td class="num stock">12</td>
+          <td class="num"><input class="thr-input" value="5" aria-label="Azúcar threshold" /></td>
+          <td><span class="status-ok">In stock</span></td>
+        </tr>
+        <tr>
+          <td class="product">Yerba<div class="muted">No threshold set → default 5</div></td>
+          <td class="num stock">5</td>
+          <td class="num"><input class="thr-input" value="" placeholder="—" aria-label="Yerba threshold" /></td>
+          <td><span class="low-stock-badge">Low stock</span></td>
+        </tr>
+        <tr>
+          <td class="product">Harina<div class="muted">Threshold 0</div></td>
+          <td class="num stock">0</td>
+          <td class="num"><input class="thr-input" value="0" aria-label="Harina threshold" /></td>
+          <td><span class="low-stock-badge">Low stock</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tokens">
+    <h2>Badge design tokens — Task #23 (zero tolerance)</h2>
+    <div class="token-grid">
+      <div class="token"><div class="k">background-color</div><div class="v"><span class="swatch" style="background:#B4231F"></span>#B4231F</div></div>
+      <div class="token"><div class="k">color</div><div class="v"><span class="swatch" style="background:#FFFFFF"></span>#FFFFFF</div></div>
+      <div class="token"><div class="k">font-size</div><div class="v">12px</div></div>
+      <div class="token"><div class="k">font-weight</div><div class="v">600</div></div>
+      <div class="token"><div class="k">padding</div><div class="v">2px 8px</div></div>
+      <div class="token"><div class="k">border-radius</div><div class="v">10px</div></div>
+      <div class="token"><div class="k">letter-spacing</div><div class="v">0.02em</div></div>
+    </div>
+  </div>
+
+  <p class="caption">
+    Owner view (Ana). The badge renders iff the API reports <code>belowThreshold = true</code> (FE1); the threshold control is owner-only (FE2).
+    Yerba has no threshold set and falls back to the documented default of 5 — at Stock 5 it sits on the boundary (<code>≤</code>) and shows the badge, per Ana's rule that the default must fail toward the alert. Design source of record for Route B: the seven tokens above are the exact values the design test compares against the badge's computed style.
+  </p>
+</body>
+</html>

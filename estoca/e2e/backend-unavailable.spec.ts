@@ -19,7 +19,7 @@ test('when the backend is unreachable, the Merchant sees a reassuring message an
 
   await estoca.open();
 
-  await expect(estoca.unavailableAlert).toContainText('No pudimos cargar tu stock');
-  await expect(estoca.unavailableAlert).toContainText('no se perdió nada');
+  await expect(estoca.unavailableAlert).toContainText('We could not load your stock');
+  await expect(estoca.unavailableAlert).toContainText('nothing was lost');
   await expect(estoca.retryButton).toBeVisible();
 });

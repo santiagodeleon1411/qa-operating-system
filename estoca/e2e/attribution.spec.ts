@@ -7,10 +7,10 @@ import { PRODUCTS, LOGINS } from './estoca-page';
 test('a recorded movement names who made it, visible in the history', async ({ estoca }) => {
   await estoca.login(LOGINS.bruno.username, LOGINS.bruno.password);
 
-  await estoca.recordMovement({ product: PRODUCTS.cafe, kind: 'entry', quantity: 5, reason: 'Compra' });
+  await estoca.recordMovement({ product: PRODUCTS.cafe, kind: 'entry', quantity: 5, reason: 'Purchase' });
 
   const latest = estoca.firstHistoryRow();
   await expect(latest).toContainText('Bruno'); // the actor, proven by the session — not claimed
   await expect(latest).toContainText(PRODUCTS.cafe);
-  await expect(latest).toContainText('Compra');
+  await expect(latest).toContainText('Purchase');
 });
